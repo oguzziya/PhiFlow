@@ -24,5 +24,11 @@ class AxisOrder:
         else:
             return np.array([1] + [0] * (rank - 1))
 
+    def axis_name(self, index, spatial_rank):
+        if self.is_x_first:
+            return ['x', 'y', 'z', 'w'][:spatial_rank][index]
+        else:
+            return ['x', 'y', 'z', 'w'][:spatial_rank][::-1][index]
+
 
 GLOBAL_AXIS_ORDER = AxisOrder()
