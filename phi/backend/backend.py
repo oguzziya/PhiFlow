@@ -79,6 +79,9 @@ class Backend:
     def copy(self, tensor, only_mutable=False):
         raise NotImplementedError()
 
+    def transpose(self, tensor, axes):
+        raise NotImplementedError()
+
     def equal(self, x, y):
         raise NotImplementedError()
 

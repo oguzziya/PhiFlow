@@ -109,6 +109,7 @@ tile = DYNAMIC_BACKEND.tile
 to_complex = DYNAMIC_BACKEND.to_complex
 to_float = DYNAMIC_BACKEND.to_float
 to_int = DYNAMIC_BACKEND.to_int
+transpose = DYNAMIC_BACKEND.transpose
 unstack = DYNAMIC_BACKEND.unstack
 where = DYNAMIC_BACKEND.where
 while_loop = DYNAMIC_BACKEND.while_loop

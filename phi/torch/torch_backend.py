@@ -47,6 +47,9 @@ class TorchBackend(Backend):
     def copy(self, tensor, only_mutable=False):
         return torch.clone(tensor)
 
+    def transpose(self, tensor, axes):
+        return torch.permute(tensor, axes)
+
     def equal(self, x, y):
         return x == y
 

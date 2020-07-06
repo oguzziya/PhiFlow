@@ -68,6 +68,9 @@ class SciPyBackend(Backend):
     def copy(self, tensor, only_mutable=False):
         return np.copy(tensor)
 
+    def transpose(self, tensor, axes):
+        return np.transpose(tensor, axes)
+
     def equal(self, x, y):
         """ array equality comparison """
         return np.equal(x, y)

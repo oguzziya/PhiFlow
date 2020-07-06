@@ -53,6 +53,9 @@ class TFBackend(Backend):
         else:
             return tensor
 
+    def transpose(self, tensor, axes):
+        return tf.transpose(tensor, perm=axes)
+
     def equal(self, x, y):
         return tf.equal(x, y)
 

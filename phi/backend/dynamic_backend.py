@@ -65,6 +65,9 @@ class DynamicBackend(Backend):
     def copy(self, tensor, only_mutable=False):
         return self.choose_backend(tensor).copy(tensor, only_mutable=only_mutable)
 
+    def transpose(self, tensor, axes):
+        return self.choose_backend(tensor).transpose(tensor, axes=axes)
+
     def equal(self, x, y):
         return self.choose_backend([x, y]).equal(x, y)
 
