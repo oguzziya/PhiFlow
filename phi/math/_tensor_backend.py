@@ -145,10 +145,10 @@ class TensorBackend(Backend):
         raise NotImplementedError()
 
     def shape(self, tensor):
-        raise NotImplementedError()
+        return tensor.shape.sizes
 
     def staticshape(self, tensor):
-        raise NotImplementedError()
+        return tensor.shape.sizes
 
     def to_float(self, x, float64=False):
         return tensor(x)._op1(partial(math.to_float, float64=float64))
@@ -164,6 +164,10 @@ class TensorBackend(Backend):
 
     def gather_nd(self, values, indices, batch_dims=0):
         raise NotImplementedError()
+
+    def unstack(self, tensor, axis=0, keepdims=False):
+        assert isinstance(tensor, AbstractTensor)
+        return tensor.unstack(tensor.shape.names[axis])
 
     def std(self, x, axis=None, keepdims=False):
         raise NotImplementedError()

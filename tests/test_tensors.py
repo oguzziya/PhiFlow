@@ -35,6 +35,10 @@ class TestTensors(TestCase):
         vx, vy = v.unstack()
         self.assertEqual('(x=4, y=3 | batch=10)', repr(vx.shape))
 
+    def test_native_slice(self):
+        v = tensor(np.ones([1, 4, 3, 2]))
+        v0 = v.x[0].y[0]
+
     def test_native_add(self):
         physics_config.x_first()
         v = tensor(np.ones([1, 4, 3, 2]))

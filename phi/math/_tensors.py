@@ -1,4 +1,5 @@
 import numbers
+import warnings
 
 import numpy as np
 
@@ -221,7 +222,7 @@ class NativeTensor(AbstractTensor):
         assert isinstance(shape, Shape)
         assert len(math.staticshape(native_tensor)) == shape.rank
         self.tensor = native_tensor
-        self._shape = shape
+        self._shape = shape.with_linear_indices()
 
     def native(self, order=None):
         if order is None or tuple(order) == self.shape.names:
@@ -251,8 +252,11 @@ class NativeTensor(AbstractTensor):
             assert self.shape.channel.rank == 1
             item = {0: item}
         if isinstance(item, (tuple, list)):
-            assert self.shape.channel.rank == len(item)
-            item = {i: selection for i, selection in enumerate(item)}
+            if len(item) == self.shape.channel.rank:
+                item = {i: selection for i, selection in enumerate(item)}
+            elif len(item) == self.shape.rank:  # legacy indexing
+                warnings.warn("Slicing with sequence should only be used for channel dimensions.")
+                item = {name: selection for name, selection in zip(self.shape.names, item)}
         assert isinstance(item, dict)  # dict mapping name -> slice/int
         new_shape = self.shape
         selections = [slice(None)] * self.rank

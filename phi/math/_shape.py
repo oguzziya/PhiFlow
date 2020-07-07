@@ -46,6 +46,9 @@ class Shape:
     def indices(self):
         return tuple(self._indices)
 
+    def with_linear_indices(self):
+        return Shape(self._sizes, self._names, self._types)
+
     @property
     def named_sizes(self):
         return {name: size for name, size in zip(self._names, self._sizes)}.items()
@@ -76,24 +79,23 @@ class Shape:
     def get_type(self, name):
         return self._types[self.names.index(name)]
 
-    def __getitem__(self, item):
-        return Shape(self._sizes[item], self._names[item], self._types[item])
-
-    def filter(self, boolean_mask):
-        selection = np.argwhere(boolean_mask)[:, 0]
+    def __getitem__(self, selection):
         return Shape(self._sizes[selection], self._names[selection], self._types[selection], indices=self._indices[selection])
+
+    def filtered(self, boolean_mask):
+        return self[np.argwhere(boolean_mask)[:, 0]]
 
     @property
     def channel(self):
-        return self.filter(self._types == CHANNEL_DIM)
+        return self.filtered(self._types == CHANNEL_DIM)
 
     @property
     def spatial(self):
-        return self.filter(self._types == SPATIAL_DIM)
+        return self.filtered(self._types == SPATIAL_DIM)
 
     @property
     def batch(self):
-        return self.filter(self._types == BATCH_DIM)
+        return self.filtered(self._types == BATCH_DIM)
 
     @property
     def sorted(self):
@@ -136,21 +138,6 @@ class Shape:
             else:
                 self_size = self.get_size(name)
                 assert size == self_size, 'Incompatible batch dimensions: %s and %s' % (self, other)
-        # --- channel ---
-        # channel dimensions must match exactly or one shape has none
-        if self.channel.rank == 0:
-            sizes.extend(other.channel._sizes)
-            names.extend(other.channel._names)
-            types.extend(other.channel._types)
-        elif other.channel.rank == 0:
-            sizes.extend(self.channel._sizes)
-            names.extend(self.channel._names)
-            types.extend(self.channel._types)
-        else:
-            assert self.channel == other.channel, 'Incompatible channel dimensions: %s and %s' % (self, other)
-            sizes.extend(self.channel._sizes)
-            names.extend(self.channel._names)
-            types.extend(self.channel._types)
         # --- spatial ---
         # spatial dimensions must match exactly or one shape has none
         if self.spatial.rank == 0:
@@ -166,6 +153,21 @@ class Shape:
             sizes.extend(self.spatial._sizes)
             names.extend(self.spatial._names)
             types.extend(self.spatial._types)
+        # --- channel ---
+        # channel dimensions must match exactly or one shape has none
+        if self.channel.rank == 0:
+            sizes.extend(other.channel._sizes)
+            names.extend(other.channel._names)
+            types.extend(other.channel._types)
+        elif other.channel.rank == 0:
+            sizes.extend(self.channel._sizes)
+            names.extend(self.channel._names)
+            types.extend(self.channel._types)
+        else:
+            assert self.channel == other.channel, 'Incompatible channel dimensions: %s and %s' % (self, other)
+            sizes.extend(self.channel._sizes)
+            names.extend(self.channel._names)
+            types.extend(self.channel._types)
         return Shape(sizes, names, types)
 
     def plus(self, size, name, dim_type):
