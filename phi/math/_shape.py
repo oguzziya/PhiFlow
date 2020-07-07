@@ -102,16 +102,8 @@ class Shape:
         return self[np.argsort(self._names)]
 
     def __repr__(self):
-        string = '('
-        string += ', '.join([repr(size) for size in self.channel.sorted._sizes])
-        if self.channel.rank > 0 and (self.spatial.rank + self.batch.rank) > 0:
-            string += ' | '
-        string += ', '.join(["%s=%d" % (name, size) for name, size in self.spatial.sorted.named_sizes])
-        if self.spatial.rank > 0 and self.batch.rank > 0:
-            string += ' | '
-        string += ', '.join(["%s=%d" % (name, size) for name, size in self.batch.sorted.named_sizes])
-        string += ')'
-        return string
+        strings = ['%s=%d' % (name, size) if isinstance(name, str) else '%d' % size for size, name, type in self.dimensions]
+        return '(' + ', '.join(strings) + ')'
 
     def __eq__(self, other):
         if not isinstance(other, Shape):

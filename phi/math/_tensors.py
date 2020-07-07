@@ -279,6 +279,9 @@ class NativeTensor(AbstractTensor):
 
 
 class CollapsedTensor(AbstractTensor):
+    """
+    Tiled / Repeated tensor along additional axes.
+    """
 
     def __init__(self, tensor, shape):
         assert isinstance(tensor, AbstractTensor)
@@ -321,6 +324,10 @@ class CollapsedTensor(AbstractTensor):
 
 
 class TensorStack(AbstractTensor):
+    """
+    Implicit stack of multiple tensors.
+    List of tensors, does not store stacked tensor in memory.
+    """
 
     def __init__(self, tensors, dim_name, dim_type):
         assert isinstance(tensors, (tuple, list, np.ndarray))
