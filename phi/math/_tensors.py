@@ -4,7 +4,7 @@ import warnings
 import numpy as np
 
 from .. import math
-from ._shape import Shape, UNKNOWN_DIM, infer_shape, CHANNEL_DIM
+from ._shape import Shape, UNKNOWN_DIM, infer_shape, CHANNEL_DIM, BATCH_DIM, SPATIAL_DIM
 
 
 class AbstractTensor:
@@ -40,6 +40,9 @@ class AbstractTensor:
 
     @property
     def shape(self):
+        raise NotImplementedError()
+
+    def _with_shape_replaced(self, new_shape):
         raise NotImplementedError()
 
     @property
@@ -244,6 +247,42 @@ class _TensorDim:
     def unstack(self):
         return self.tensor.unstack(self.name)
 
+    @property
+    def index(self):
+        return self.tensor.shape.index(self.name)
+
+    def __int__(self):
+        return self.index
+
+    def __str__(self):
+        return self.name
+
+    def as_batch(self):
+        shape = self.tensor.shape
+        new_types = list(shape.types)
+        new_types[self.index] = BATCH_DIM
+        new_shape = Shape(shape.sizes, shape.names, new_types)
+        return self.tensor._with_shape_replaced(new_shape)
+
+    def as_spatial(self):
+        shape = self.tensor.shape
+        new_types = list(shape.types)
+        new_types[self.index] = SPATIAL_DIM
+        new_shape = Shape(shape.sizes, shape.names, new_types)
+        return self.tensor._with_shape_replaced(new_shape)
+
+    @property
+    def is_spatial(self):
+        return self.tensor.shape.types[self.index] == SPATIAL_DIM
+
+    @property
+    def is_batch(self):
+        return self.tensor.shape.types[self.index] == BATCH_DIM
+
+    @property
+    def is_channel(self):
+        return self.tensor.shape.types[self.index] == CHANNEL_DIM
+
 
 class NativeTensor(AbstractTensor):
 
@@ -275,6 +314,9 @@ class NativeTensor(AbstractTensor):
     @property
     def shape(self):
         return self._shape
+
+    def _with_shape_replaced(self, new_shape):
+        return NativeTensor(self.tensor, new_shape)
 
     def __getitem__(self, item):
         if isinstance(item, (slice, int)):  # Channel dimension

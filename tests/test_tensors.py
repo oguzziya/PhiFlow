@@ -29,6 +29,16 @@ class TestTensors(TestCase):
         a = tensor([1, 2, 3])
         self.assertEqual((3,), a.shape.sizes)
 
+    def test_dimension_types(self):
+        physics_config.x_first()
+        v = tensor(np.ones([10, 4, 3, 2]))
+        self.assertEqual(v.x.index, 1)
+        self.assertEqual(v.x.name, 'x')
+        self.assertTrue(v.x.is_spatial)
+        self.assertTrue(v.batch.is_batch)
+        b = v.x.as_batch()
+        self.assertTrue(b.x.is_batch)
+
     def test_native_unstack(self):
         physics_config.x_first()
         v = tensor(np.ones([10, 4, 3, 2]))
