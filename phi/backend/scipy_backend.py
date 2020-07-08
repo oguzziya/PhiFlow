@@ -65,6 +65,12 @@ class SciPyBackend(Backend):
         else:
             return False
 
+    def numpy(self, tensor):
+        if isinstance(tensor, np.ndarray):
+            return tensor
+        else:
+            return np.array(tensor)
+
     def copy(self, tensor, only_mutable=False):
         return np.copy(tensor)
 

@@ -44,6 +44,9 @@ class TorchBackend(Backend):
                 tensor = self.to_float(tensor)
         return tensor
 
+    def numpy(self, tensor):
+        return tensor.numpy()
+
     def copy(self, tensor, only_mutable=False):
         return torch.clone(tensor)
 

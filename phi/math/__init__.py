@@ -84,6 +84,7 @@ minimum = DYNAMIC_BACKEND.minimum
 mul = DYNAMIC_BACKEND.mul
 name = DYNAMIC_BACKEND.name
 ndims = DYNAMIC_BACKEND.ndims
+numpy = DYNAMIC_BACKEND.numpy
 ones_like = DYNAMIC_BACKEND.ones_like
 pad = DYNAMIC_BACKEND.pad
 pow = DYNAMIC_BACKEND.pow

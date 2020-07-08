@@ -76,6 +76,9 @@ class Backend:
         """
         raise NotImplementedError()
 
+    def numpy(self, tensor):
+        raise NotImplementedError()
+
     def copy(self, tensor, only_mutable=False):
         raise NotImplementedError()
 

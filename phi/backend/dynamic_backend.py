@@ -62,6 +62,9 @@ class DynamicBackend(Backend):
     def as_tensor(self, x, convert_external=True):
         return self.choose_backend(x).as_tensor(x, convert_external=convert_external)
 
+    def numpy(self, tensor):
+        return self.choose_backend(tensor).numpy(tensor)
+
     def copy(self, tensor, only_mutable=False):
         return self.choose_backend(tensor).copy(tensor, only_mutable=only_mutable)
 

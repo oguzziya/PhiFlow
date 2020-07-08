@@ -47,6 +47,9 @@ class TFBackend(Backend):
                 tensor = self.to_float(tensor)
         return tensor
 
+    def numpy(self, tensor):
+        return tensor.numpy()
+
     def copy(self, tensor, only_mutable=False):
         if not only_mutable or tf.executing_eagerly():
             return tf.identity(tensor)
