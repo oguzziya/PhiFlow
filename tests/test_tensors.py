@@ -2,7 +2,7 @@ from unittest import TestCase
 from phi.flow import *
 from phi.math._shape import *
 from phi.math._tensor_initializers import zero
-from phi.math._tensors import tensor
+from phi.math._tensors import tensor, TensorStack
 
 import numpy as np
 
@@ -26,6 +26,8 @@ class TestTensors(TestCase):
         self.assertEqual((4, 3, 2), v.shape.sizes)
         v = tensor(np.ones([10, 4, 3, 2]))
         self.assertEqual((10, 4, 3, 2), v.shape.sizes)
+        scalar = tensor(np.ones([1, 4, 3, 1]))
+        self.assertEqual((4, 3), scalar.shape.sizes)
         a = tensor([1, 2, 3])
         self.assertEqual((3,), a.shape.sizes)
 
@@ -72,6 +74,39 @@ class TestTensors(TestCase):
         v = tensor(np.ones([1, 4, 3, 2]))
         math.maximum(0, v).assert_close(1)
         math.maximum(0, -v).assert_close(0)
+
+    def test_stacked_shapes(self):
+        physics_config.x_last()
+        t0 = tensor(np.ones([10, 4, 3, 2]))
+        for dim in t0.dimensions:
+            tensors = dim.unstack()
+            stacked = TensorStack(tensors, dim.name, dim.dim_type)
+            self.assertEqual(set(t0.shape.names), set(stacked.shape.names))
+            self.assertEqual(t0.shape.volume, stacked.shape.volume)
+
+    def test_stacked_native(self):
+        physics_config.x_last()
+        t0 = tensor(np.ones([10, 4, 3, 2]))
+        tensors = t0.unstack()
+        stacked = TensorStack(tensors, 0, CHANNEL_DIM)
+        stacked.assert_close(t0)
+        self.assertEqual((10, 4, 3, 2), stacked.native().shape)
+        self.assertEqual((3, 4, 2, 10), stacked.native(order=('x', 'y', 0, 'batch')).shape)
+        self.assertEqual((2, 10, 4, 3), stacked.native(order=(0, 'batch', 'y', 'x')).shape)  # this should re-stack since only the stacked dimension position is different
+
+    def test_stacked_get(self):
+        physics_config.x_first()
+        t0 = tensor(np.ones([10, 4, 3, 2]))
+        tensors = t0.unstack()
+        stacked = TensorStack(tensors, 0, CHANNEL_DIM)
+        self.assertEqual(tensors, stacked.unstack())
+        assert tensors[0] is stacked[0]
+        assert tensors[1] is stacked[1:2].unstack()[0]
+        self.assertEqual(4, len(stacked.x.unstack()))
+
+
+
+
 
 
 # print(a)

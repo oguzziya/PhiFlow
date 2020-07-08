@@ -59,31 +59,48 @@ class AbstractTensor:
             return "[%s, %s ...]" % (self.dtype, self.shape)
 
     def __getitem__(self, item):
+        if isinstance(item, (slice, int)):  # Channel dimension
+            assert self.shape.channel.rank == 1
+            item = {0: item}
+        if isinstance(item, (tuple, list)):
+            if len(item) == self.shape.channel.rank:
+                item = {i: selection for i, selection in enumerate(item)}
+            elif len(item) == self.shape.rank:  # legacy indexing
+                warnings.warn("Slicing with sequence should only be used for channel dimensions.")
+                item = {name: selection for name, selection in zip(self.shape.names, item)}
+        assert isinstance(item, dict)  # dict mapping name -> slice/int
+        return self._getitem(item)
+
+    def _getitem(self, selection_dict):
         raise NotImplementedError()
 
-    def __setitem__(self, key, value):
-        """
-        All tensors are editable.
+    # def __setitem__(self, key, value):
+    #     """
+    #     All tensors are editable.
+    #
+    #     :param key: list/tuple of slices / indices
+    #     :param value:
+    #     :return:
+    #     """
+    #     raise NotImplementedError()
 
-        :param key: list/tuple of slices / indices
-        :param value:
-        :return:
-        """
-        raise NotImplementedError()
-
-    def unstack(self, dimension=None):
+    def unstack(self, dimension=0):
         """
         Splits this tensor along the specified dimension.
         The returned tensors have the same dimensions as this tensor save the unstacked dimension.
 
         :param dimension: name of dimension or Dimension or None for component dimension
-        :type dimension: str or Dimension or _TensorDim
+        :type dimension: str or int or _TensorDim
         :return: tuple of tensors
         """
         raise NotImplementedError()
 
     def dimension(self, name):
         return _TensorDim(self, name)
+
+    @property
+    def dimensions(self):
+        return [_TensorDim(self, name) for name in self.shape.names]
 
     def __getattr__(self, name):
         if name in self.shape:
@@ -238,11 +255,8 @@ class _TensorDim:
         self.tensor = tensor
         self.name = name
 
-    def __getitem__(self, item):
-        return self.tensor[{self.name: item}]
-
-    def __setitem__(self, key, value):
-        self.tensor[{self.name: key}] = value
+    def __str__(self):
+        return self.name
 
     def unstack(self):
         return self.tensor.unstack(self.name)
@@ -254,8 +268,9 @@ class _TensorDim:
     def __int__(self):
         return self.index
 
-    def __str__(self):
-        return self.name
+    @property
+    def size(self):
+        return self.tensor.shape.sizes[self.index]
 
     def as_batch(self):
         shape = self.tensor.shape
@@ -272,6 +287,10 @@ class _TensorDim:
         return self.tensor._with_shape_replaced(new_shape)
 
     @property
+    def dim_type(self):
+        return self.tensor.shape.types[self.index]
+
+    @property
     def is_spatial(self):
         return self.tensor.shape.types[self.index] == SPATIAL_DIM
 
@@ -282,6 +301,12 @@ class _TensorDim:
     @property
     def is_channel(self):
         return self.tensor.shape.types[self.index] == CHANNEL_DIM
+
+    def __getitem__(self, item):
+        return self.tensor[{self.name: item}]
+
+    def __setitem__(self, key, value):
+        self.tensor[{self.name: key}] = value
 
 
 class NativeTensor(AbstractTensor):
@@ -301,7 +326,7 @@ class NativeTensor(AbstractTensor):
         for name in order:
             if name not in self.shape:
                 tensor = math.expand_dims(tensor, axis=-1)
-                shape = shape.plus(1, name, UNKNOWN_DIM)
+                shape = shape.plus(1, name, UNKNOWN_DIM, pos=-1)
         # --- Transpose ---
         perm = shape.perm(order)
         tensor = math.transpose(tensor, perm)
@@ -318,20 +343,10 @@ class NativeTensor(AbstractTensor):
     def _with_shape_replaced(self, new_shape):
         return NativeTensor(self.tensor, new_shape)
 
-    def __getitem__(self, item):
-        if isinstance(item, (slice, int)):  # Channel dimension
-            assert self.shape.channel.rank == 1
-            item = {0: item}
-        if isinstance(item, (tuple, list)):
-            if len(item) == self.shape.channel.rank:
-                item = {i: selection for i, selection in enumerate(item)}
-            elif len(item) == self.shape.rank:  # legacy indexing
-                warnings.warn("Slicing with sequence should only be used for channel dimensions.")
-                item = {name: selection for name, selection in zip(self.shape.names, item)}
-        assert isinstance(item, dict)  # dict mapping name -> slice/int
+    def _getitem(self, seleciton_dict):
         new_shape = self.shape
         selections = [slice(None)] * self.rank
-        for name, selection in item.items():
+        for name, selection in seleciton_dict.items():
             selections[self.shape.index(name)] = selection
             if isinstance(selection, int):
                 new_shape -= name
@@ -339,14 +354,11 @@ class NativeTensor(AbstractTensor):
         new_shape = new_shape.with_sizes(math.staticshape(gathered))
         return NativeTensor(gathered, new_shape)
 
-    def __setitem__(self, key, value):
-        pass
-
-    def unstack(self, name=0):
-        dim_index = self.shape.index(name)
-        new_shape = self.shape - name
+    def unstack(self, dimension=0):
+        dim_index = self.shape.index(dimension)
+        new_shape = self.shape - dimension
         tensors = math.unstack(self.tensor, axis=dim_index)
-        return [NativeTensor(t, new_shape) for t in tensors]
+        return tuple([NativeTensor(t, new_shape) for t in tensors])
 
 
 class CollapsedTensor(AbstractTensor):
@@ -382,9 +394,6 @@ class CollapsedTensor(AbstractTensor):
     def __getitem__(self, item):
         pass
 
-    def __setitem__(self, key, value):
-        pass
-
     def unstack(self, dimension=None):
         dimension = self.shape[dimension]
         if dimension in self.tensor.shape:
@@ -401,21 +410,20 @@ class TensorStack(AbstractTensor):
     """
 
     def __init__(self, tensors, dim_name, dim_type):
-        assert isinstance(tensors, (tuple, list, np.ndarray))
-        assert len(tensors) > 0
         for tensor in tensors:
             assert isinstance(tensor, AbstractTensor)
-        common_shape = tensors[0].shape
-        for tensor in tensors[1:]:
             assert tensor.dtype == tensors[0].dtype
-            common_shape = common_shape.combined(tensor.shape)
-        tensors = [tensor.transpose(common_shape) for tensor in tensors]
-        self.tensors = tensors
-        self._shape = common_shape.dim_inserted(stack_position, len(tensors), dim_name, dim_type)
+            assert tensor.shape == tensors[0].shape
+        self.tensors = tuple(tensors)
+        self.stack_dim_name = dim_name
+        self._shape = tensors[0].shape.plus(len(tensors), dim_name, dim_type, pos=None)
+        self._cached = None
 
-    def native(self, order=None):
-        np_tensors = [tensor.numpy() for tensor in self.tensors]
-        return np.stack(np_tensors, axis=0)
+    def _cache(self):
+        if self._cached is None:
+            native = math.stack([t.native() for t in self.tensors], axis=self.shape.index(self.stack_dim_name))
+            self._cached = NativeTensor(native, self._shape)
+        return self._cached
 
     @property
     def dtype(self):
@@ -425,20 +433,38 @@ class TensorStack(AbstractTensor):
     def shape(self):
         return self._shape
 
-    def __getitem__(self, item):
-        pass
+    def native(self, order=None):
+        if self._cached is not None:
+            return self._cached.native(order=order)
+        # Is only the stack dimension shifted?
+        if order is not None and (self._shape - self.stack_dim_name).names == tuple(filter(lambda name: name != self.stack_dim_name, order)):
+            native = math.stack([t.native() for t in self.tensors], axis=tuple(order).index(self.stack_dim_name))
+            return native
+        return self._cache().native(order=order)
 
-    def __setitem__(self, key, value):
-        pass
+    def _with_shape_replaced(self, new_shape):
+        assert isinstance(new_shape, Shape)
+        inner_shape = new_shape - self.stack_dim_name
+        tensors = [t._with_shape_replaced(inner_shape) for t in self.tensors]
+        return TensorStack(tensors, self.stack_dim_name, new_shape.get_type(self.stack_dim_name))
 
-    def unstack(self, dimension=None):
-        pass
+    def _getitem(self, selection_dict):
+        if self.stack_dim_name in selection_dict and len(selection_dict) == 1:
+            selection = selection_dict[self.stack_dim_name]
+            if isinstance(selection, int):
+                return self.tensors[selection]
+            elif isinstance(selection, slice):
+                return TensorStack(self.tensors[selection], self.stack_dim_name, self.shape.get_type(self.stack_dim_name))
+            else:
+                raise NotImplementedError()
+        else:
+            return self._cache()._getitem(selection_dict)
 
-    def requires_transpose(self, target_shape):
-        pass
-
-    def transpose(self, target_shape):
-        pass
+    def unstack(self, dimension=0):
+        if dimension == self.stack_dim_name:
+            return self.tensors
+        else:
+            return self._cache().unstack(dimension=dimension)
 
 
 def tensor(*objects, infer_dimension_types=True):
@@ -455,7 +481,7 @@ def _tensor(obj, infer_dimension_types=True):
         if infer_dimension_types:
             shape = infer_shape(obj.shape)
             tensor = NativeTensor(obj, shape)
-            tensor = _remove_singleton_batch_dimensions(tensor)
+            tensor = _remove_singleton_dimensions(tensor)
             return tensor
         else:
             shape = Shape(obj.shape, names=range(len(obj.shape)), types=[CHANNEL_DIM] * len(obj.shape))
@@ -481,8 +507,21 @@ def broadcastable_native_tensors(*tensors):
     return broadcast_shape, natives
 
 
-def _remove_singleton_batch_dimensions(tensor):
-    for i, size, name, _ in tensor.shape.batch.indexed_dimensions:  # remove singleton batch dimensions
-        if size == 1:
-            tensor = tensor.dimension(name)[0]
+def _remove_singleton_dimensions(tensor):
+    """
+    Remove singleton batch and channel dimensions
+    :type tensor: AbstractTensor
+    :rtype: AbstractTensor
+    """
+    for dim in tensor.dimensions:
+        if dim.size == 1 and (dim.is_batch or dim.is_channel):
+            return _remove_singleton_dimensions(dim[0])  # iter over old dimensions is no longer correct
     return tensor
+
+
+def shapeof(tensor):
+    if isinstance(tensor, AbstractTensor):
+        return tensor.shape
+    else:
+        shape = math.staticshape(tensor)
+        return infer_shape(shape)

@@ -97,10 +97,6 @@ class Shape:
     def batch(self):
         return self.filtered(self._types == BATCH_DIM)
 
-    @property
-    def sorted(self):
-        return self[np.argsort(self._names)]
-
     def __repr__(self):
         strings = ['%s=%d' % (name, size) if isinstance(name, str) else '%d' % size for size, name, type in self.dimensions]
         return '(' + ', '.join(strings) + ')'
@@ -162,8 +158,22 @@ class Shape:
             types.extend(self.channel._types)
         return Shape(sizes, names, types)
 
-    def plus(self, size, name, dim_type):
-        return Shape(self.sizes + (size,), self.names + (name,), self.types + (dim_type,), self.indices + (len(self),))
+    def plus(self, size, name, dim_type, pos=None):
+        if pos is None:
+            same_type_dims = self.filtered(self._types == dim_type)
+            if len(same_type_dims) > 0:
+                pos = same_type_dims._indices[-1] + 1
+            else:
+                pos = {BATCH_DIM: 0, SPATIAL_DIM: self.batch.rank+1, CHANNEL_DIM: self.rank + 1}[dim_type]
+        elif pos < 0:
+            pos += self.rank + 1
+        sizes = list(self._sizes)
+        names = list(self._names)
+        types = list(self._types)
+        sizes.insert(pos, size)
+        names.insert(pos, name)
+        types.insert(pos, dim_type)
+        return Shape(sizes, names, types)
 
     def __sub__(self, other):
         if isinstance(other, (str, int)):
@@ -192,6 +202,16 @@ class Shape:
         This is the product of all dimension sizes.
         """
         return math.prod(self._sizes)
+
+    def order(self, sequence, default=None):
+        if isinstance(sequence, dict):
+            result = [sequence.get(name, default) for name in self._names]
+            return result
+        if isinstance(sequence, (tuple, list)):
+            assert len(sequence) == self.rank
+            return sequence
+        else:  # just a constant
+            return sequence
 
 
 def define_shape(channels=(), batch=None, **spatial):
