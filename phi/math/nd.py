@@ -1,12 +1,16 @@
 # Because division is different in Python 2 and 3
 from __future__ import division
 
+import warnings
+
 import numpy as np
 
 from phi import struct
 from phi.backend.dynamic_backend import DYNAMIC_BACKEND as math
 from phi.struct.functions import mappable
-from .helper import _get_pad_width_axes, _get_pad_width, spatial_rank, _dim_shifted, _contains_axis, spatial_dimensions, all_dimensions, rank
+from ._shape import CHANNEL_DIM
+from ._tensors import tensor, AbstractTensor, TensorStack
+from .helper import _get_pad_width_axes, _get_pad_width, spatial_rank, _dim_shifted, _contains_axis, spatial_dimensions, all_dimensions, rank, _multi_roll
 
 
 def indices_tensor(tensor, dtype=None):
@@ -186,7 +190,7 @@ def _divergence_nd(tensor, relative_shifts):
 
 # Gradient
 
-def gradient(tensor, dx=1, difference='forward', padding='replicate'):
+def gradient(tensor, dx=1, difference='forward', padding='replicate', axes=None):
     """
     Calculates the gradient of a scalar channel from finite differences.
     The gradient vectors are in reverse order, lowest dimension first.
@@ -197,35 +201,46 @@ def gradient(tensor, dx=1, difference='forward', padding='replicate'):
     :param padding: tensor padding mode
     :return: tensor of shape (batch_size, spatial_dimensions..., spatial rank)
     """
-    assert tensor.shape[-1] == 1, "Gradient requires a scalar channel as input"
-    assert 1 not in tensor.shape[1:-1], "All spatial dimensions must have size larger than 1, got %s" % tensor.shape
     if difference.lower() == 'central':
-        return _gradient_nd(tensor, padding, (-1, 1)) / (dx * 2)
+        return _gradient_nd(tensor, padding, (-1, 1), axes) / (dx * 2)
     elif difference.lower() == 'forward':
-        return _gradient_nd(tensor, padding, (0, 1)) / dx
+        return _gradient_nd(tensor, padding, (0, 1), axes) / dx
     elif difference.lower() == 'backward':
-        return _gradient_nd(tensor, padding, (-1, 0)) / dx
+        return _gradient_nd(tensor, padding, (-1, 0), axes) / dx
     else:
         raise ValueError('Invalid difference type: {}. Can be CENTRAL or FORWARD'.format(difference))
 
 
-def _gradient_nd(tensor, padding, relative_shifts):
-    rank = spatial_rank(tensor)
-    tensor = math.pad(tensor, _get_pad_width(rank, (-relative_shifts[0], relative_shifts[1])), mode=padding)
-    components = []
-    for dimension in range(rank):
-        lower, upper = _dim_shifted(tensor, dimension, relative_shifts, diminish_others=(-relative_shifts[0], relative_shifts[1]))
-        components.append(upper - lower)
-    return math.concat(components, axis=-1)
+def _gradient_nd(x_, padding, relative_shifts, axes):
+    x = tensor(x_)
+    axes = axes if axes is not None else x.shape.spatial.names
+    x = math.pad(x, {axis: (-relative_shifts[0], relative_shifts[1]) for axis in axes}, mode=padding)
+    components = {}
+    for dimension in axes:
+        lower, upper = _multi_roll(x, dimension, relative_shifts, diminish_others=(-relative_shifts[0], relative_shifts[1]), names=axes)
+        components[dimension] = upper - lower
+    result = vector_stack(components)
+    if isinstance(x_, AbstractTensor):
+        return result
+    else:
+        return result.native()
 
 
 def axis_gradient(tensor, spatial_axis):
+    warnings.warn("axis_gradient is deprecated, use gradient(axes=('x',) instead")
     dims = range(spatial_rank(tensor))
     upper_slices = tuple([(slice(1, None) if i == spatial_axis else slice(None)) for i in dims])
     lower_slices = tuple([(slice(-1) if i == spatial_axis else slice(None)) for i in dims])
     diff = tensor[(slice(None),) + upper_slices + (slice(None),)] \
         - tensor[(slice(None),) + lower_slices + (slice(None),)]
     return diff
+
+
+def vector_stack(tensor_dict):
+    shape = next(iter(tensor_dict.values())).shape
+    ordered_names = sorted(tensor_dict.keys(), key=lambda name: shape.index(name))
+    ordered_tensors = [tensor_dict[name] for name in ordered_names]
+    return TensorStack(ordered_tensors, dim_name=shape.channel.rank, dim_type=CHANNEL_DIM)
 
 
 # Laplace

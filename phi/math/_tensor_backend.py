@@ -47,6 +47,16 @@ class TensorBackend(Backend):
         raise NotImplementedError()
 
     def pad(self, value, pad_width, mode='constant', constant_values=0):
+        assert isinstance(value, AbstractTensor)
+        if isinstance(pad_width, dict):  # name -> (lower, upper) or both
+            if isinstance(value, NativeTensor):
+                native = value.tensor
+                ordered_pad_widths = value.shape.order(pad_width, default=0)
+                ordered_mode = value.shape.order(mode)
+                ordered_constant_values = value.shape.order(constant_values)
+                result_tensor = math.pad(native, ordered_pad_widths, ordered_mode, ordered_constant_values)
+                new_shape = value.shape.with_sizes(math.staticshape(result_tensor))
+                return NativeTensor(result_tensor, new_shape)
         raise NotImplementedError()
 
     def resample(self, inputs, sample_coords, interpolation='linear', boundary='constant', constant_values=0):

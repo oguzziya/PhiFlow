@@ -1,3 +1,4 @@
+from phi.math._tensors import AbstractTensor
 from phi.struct.tensorop import collapsed_gather_nd
 
 from phi.backend.dynamic_backend import DYNAMIC_BACKEND as math
@@ -77,6 +78,29 @@ def _dim_shifted(tensor, axis, relative_shifts, components=None, diminish_others
                 else:
                     slices.append(slice(None))
         sliced_tensor = tensor[(slice(None),) + tuple(slices) + (component_slice,)]
+        shifted_tensors.append(sliced_tensor)
+    return shifted_tensors
+
+
+def _multi_roll(tensor, roll_name, relative_shifts, diminish_others=(0, 0), names=None):
+    assert isinstance(tensor, AbstractTensor), tensor
+    assert len(relative_shifts) >= 2
+    total_shift = max(relative_shifts) - min(relative_shifts)
+    slice_others = slice(diminish_others[0], -diminish_others[1] if diminish_others[1] != 0 else None)
+    # --- Slice tensor to create shifts ---
+    shifted_tensors = []
+    for shift in relative_shifts:
+        slices = {}
+        for name in names:
+            if name == roll_name:
+                shift_start = shift - min(relative_shifts)
+                shift_end = shift_start - total_shift
+                if shift_end == 0:
+                    shift_end = None
+                slices[name] = slice(shift_start, shift_end)
+            else:
+                slices[name] = slice_others
+        sliced_tensor = tensor[slices]
         shifted_tensors.append(sliced_tensor)
     return shifted_tensors
 
