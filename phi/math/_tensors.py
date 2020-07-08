@@ -500,6 +500,12 @@ def _tensor(obj, infer_dimension_types=True):
 
 
 def broadcastable_native_tensors(*tensors):
+    """
+    Expands and transposes the dimensions of the given tensors so that they all have the same dimension order.
+
+    :param tensors: sequence of AbstractTensors
+    :return: (shape, native tensors)
+    """
     broadcast_shape = tensors[0].shape
     for tensor in tensors[1:]:
         broadcast_shape = broadcast_shape.combined(tensor.shape)

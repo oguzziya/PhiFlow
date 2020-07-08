@@ -159,33 +159,36 @@ def abs_square(complex):
 
 # Divergence
 
-def divergence(tensor, dx=1, difference='central'):
-    """
-    Computes the spatial divergence of a vector channel from finite differences.
-
-    :param tensor: vector field; tensor of shape (batch size, spatial dimensions..., spatial rank)
-    :param dx: distance between adjacent grid points (default 1)
-    :param difference: type of difference, one of ('forward', 'central') (default 'forward')
-    :return: tensor of shape (batch size, spatial dimensions..., 1)
-    """
-    assert difference in ('central', 'forward', 'backward'), difference
-    rank = spatial_rank(tensor)
-    if difference == 'forward':
-        return _divergence_nd(tensor, (0, 1)) / dx ** rank
-    elif difference == 'backward':
-        return _divergence_nd(tensor, (-1, 0)) / dx ** rank
-    else:
-        return _divergence_nd(tensor, (-1, 1)) / (2 * dx) ** rank
-
-
-def _divergence_nd(tensor, relative_shifts):
-    rank = spatial_rank(tensor)
-    tensor = math.pad(tensor, _get_pad_width(rank, (-relative_shifts[0], relative_shifts[1])))
-    components = []
-    for dimension in range(rank):
-        lower, upper = _dim_shifted(tensor, dimension, relative_shifts, diminish_others=(-relative_shifts[0], relative_shifts[1]), components=rank - dimension - 1)
-        components.append(upper - lower)
-    return math.sum(components, 0)
+# def divergence(tensor, dx=1, difference='central', padding='constant', axes=None):
+#     """
+#     Computes the spatial divergence of a vector channel from finite differences.
+#
+#     :param tensor: vector field; tensor of shape (batch size, spatial dimensions..., spatial rank)
+#     :param dx: distance between adjacent grid points (default 1)
+#     :param difference: type of difference, one of ('forward', 'central') (default 'forward')
+#     :return: tensor of shape (batch size, spatial dimensions..., 1)
+#     """
+#     assert difference in ('central', 'forward', 'backward'), difference
+#     rank = spatial_rank(tensor)
+#     if difference == 'forward':
+#         return _divergence_nd(tensor, padding, (0, 1), axes) / dx ** rank  # TODO why dx^rank?
+#     elif difference == 'backward':
+#         return _divergence_nd(tensor, padding, (-1, 0), axes) / dx ** rank
+#     else:
+#         return _divergence_nd(tensor, padding, (-1, 1), axes) / (2 * dx) ** rank
+#
+#
+# def _divergence_nd(x_, padding, relative_shifts, axes=None):
+#     x = tensor(x_)
+#     assert x.shape.channel.rank == 1
+#     axes = axes if axes is not None else x.shape.spatial.names
+#     x = math.pad(x, {axis: (-relative_shifts[0], relative_shifts[1]) for axis in axes}, mode=padding)
+#     components = []
+#     for dimension in axes:
+#         dim_index_in_spatial = x.shape.spatial.reset_indices().index(dimension)
+#         lower, upper = _multi_roll(x, dimension, relative_shifts, diminish_others=(-relative_shifts[0], relative_shifts[1]), names=axes, base_selection={0: rank - dimension - 1})
+#         components.append(upper - lower)
+#     return math.sum(components, 0)
 
 
 # Gradient
@@ -195,6 +198,7 @@ def gradient(tensor, dx=1, difference='forward', padding='replicate', axes=None)
     Calculates the gradient of a scalar channel from finite differences.
     The gradient vectors are in reverse order, lowest dimension first.
 
+    :param axes: (optional) sequence of dimension names
     :param tensor: channel with shape (batch_size, spatial_dimensions..., 1)
     :param dx: physical distance between grid points (default 1)
     :param difference: type of difference, one of ('forward', 'backward', 'central') (default 'forward')
@@ -245,84 +249,29 @@ def vector_stack(tensor_dict):
 
 # Laplace
 
-def laplace(tensor, padding='replicate', axes=None, use_fft_for_periodic=False):
+def laplace(tensor, dx=1, padding='replicate', axes=None):
     """
     Spatial Laplace operator as defined for scalar fields.
     If a vector field is passed, the laplace is computed component-wise.
 
-    :param use_fft_for_periodic: If True and padding='circular', uses FFT to compute laplace
     :param tensor: n-dimensional field of shape (batch, spacial dimensions..., components)
     :param padding: 'valid', 'constant', 'reflect', 'replicate', 'circular'
     :param axes: The second derivative along these axes is summed over
     :type axes: list
     :return: tensor of same shape
     """
-    rank = spatial_rank(tensor)
-    if padding is None or padding == 'valid':
-        pass  # do not pad tensor
-    elif padding in ('circular', 'wrap') and use_fft_for_periodic:
-        return fourier_laplace(tensor)
-    else:
-        tensor = math.pad(tensor, _get_pad_width_axes(rank, axes, val_true=[1, 1], val_false=[0, 0]), padding)
-    # --- convolutional laplace ---
-    if axes is not None:
-        return _sliced_laplace_nd(tensor, axes)
-    if rank == 2:
-        return _conv_laplace_2d(tensor)
-    elif rank == 3:
-        return _conv_laplace_3d(tensor)
-    else:
-        return _sliced_laplace_nd(tensor)
+    return _sliced_laplace_nd(tensor, dx, padding, axes)
 
 
-def _conv_laplace_2d(tensor):
-    kernel = math.to_float([[0., 1., 0.], [1., -4., 1.], [0., 1., 0.]])
-    kernel = kernel.reshape((3, 3, 1, 1))
-    if tensor.shape[-1] == 1:
-        return math.conv(tensor, kernel, padding='VALID')
-    else:
-        return math.concat([math.conv(tensor[..., i:i + 1], kernel, padding='VALID') for i in range(tensor.shape[-1])], -1)
-
-
-def _conv_laplace_3d(tensor):
-    """
-    3D/Cube laplace stencil in 3D+2D [3,3,3,1,1]
-    array([[[[[ 0.]], [[ 0.]], [[ 0.]]],
-            [[[ 0.]], [[ 1.]], [[ 0.]]],
-            [[[ 0.]], [[ 0.]], [[ 0.]]]],
-           [[[[ 0.]], [[ 1.]], [[ 0.]]],
-            [[[ 1.]], [[-6.]], [[ 1.]]],
-            [[[ 0.]], [[ 1.]], [[ 0.]]]],
-           [[[[ 0.]], [[ 0.]], [[ 0.]]],
-            [[[ 0.]], [[ 1.]], [[ 0.]]],
-            [[[ 0.]], [[ 0.]], [[ 0.]]]]]
-    returns ...
-
-    padding explicitly done in laplace(), hence here not needed
-    """
-    kernel = math.to_float([[[0., 0., 0.], [0., 1., 0.], [0., 0., 0.]],
-                            [[0., 1., 0.], [1., -6., 1.], [0., 1., 0.]],
-                            [[0., 0., 0.], [0., 1., 0.], [0., 0., 0.]]])
-    kernel = kernel.reshape((3, 3, 3, 1, 1))
-    if tensor.shape[-1] == 1:
-        return math.conv(tensor, kernel, padding='VALID')
-    else:
-        return math.concat([math.conv(tensor[..., i:i + 1], kernel, padding='VALID')
-                            for i in range(tensor.shape[-1])], -1)
-
-
-def _sliced_laplace_nd(tensor, axes=None):
-    """
-    Laplace Stencil for N-Dimensions
-    aggregated from (c)enter, (u)pper, and (l)ower parts
-    """
-    rank = spatial_rank(tensor)
-    dims = range(rank)
+def _sliced_laplace_nd(x_, dx, padding, axes=None):
+    x = tensor(x_)
+    axes = axes if axes is not None else x.shape.spatial.names
+    x = math.pad(x, {axis: (1, 1) for axis in axes}, mode=padding)
     components = []
-    for ax in dims:
-        if _contains_axis(axes, ax, rank):
-            lower, center, upper = _dim_shifted(tensor, ax, (-1, 0, 1), diminish_others=(1, 1), diminish_other_condition=lambda other_ax: _contains_axis(axes, other_ax, rank))
-            components.append(upper + lower - 2 * center)
+    for axis in axes:
+        axis_dx = x.shape.spatial.sequence_get(dx, axis)
+        lower, center, upper = _multi_roll(x, axis, (-1, 0, 1), diminish_others=(1, 1), names=axes)
+        components.append((upper + lower - 2 * center) / axis_dx ** 2)
     return math.sum(components, 0)
 
 
@@ -353,7 +302,6 @@ def fourier_poisson(tensor, times=1):
     fft_laplace = -(2 * np.pi)**2 * k
     fft_laplace[(0,) * math.ndims(k)] = np.inf
     return math.cast(math.real(math.ifft(math.divide_no_nan(frequencies, fft_laplace**times))), math.dtype(tensor))
-
 
 
 def fftfreq(resolution, mode='vector', dtype=None):

@@ -52,8 +52,8 @@ class TensorBackend(Backend):
             if isinstance(value, NativeTensor):
                 native = value.tensor
                 ordered_pad_widths = value.shape.order(pad_width, default=0)
-                ordered_mode = value.shape.order(mode)
-                ordered_constant_values = value.shape.order(constant_values)
+                ordered_mode = value.shape.order(mode, default='constant')
+                ordered_constant_values = value.shape.order(constant_values, default=0)
                 result_tensor = math.pad(native, ordered_pad_widths, ordered_mode, ordered_constant_values)
                 new_shape = value.shape.with_sizes(math.staticshape(result_tensor))
                 return NativeTensor(result_tensor, new_shape)
@@ -66,7 +66,13 @@ class TensorBackend(Backend):
         raise NotImplementedError()
 
     def sum(self, value, axis=None, keepdims=False):
-        raise NotImplementedError()
+        if isinstance(value, AbstractTensor):
+            raise NotImplementedError()
+        else:
+            assert axis == 0
+            shape, tensors = broadcastable_native_tensors(*value)
+            result_tensor = math.sum(tensors, axis=0, keepdims=False)
+            return NativeTensor(result_tensor, shape)
 
     def prod(self, value, axis=None):
         raise NotImplementedError()

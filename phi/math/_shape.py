@@ -213,6 +213,16 @@ class Shape:
         else:  # just a constant
             return sequence
 
+    def sequence_get(self, sequence, name):
+        if isinstance(sequence, dict):
+            return sequence[name]
+        if isinstance(sequence, (tuple, list)):
+            assert len(sequence) == self.rank
+            return sequence[self.names.index(name)]
+        else:  # just a constant
+            return sequence
+
+
 
 def define_shape(channels=(), batch=None, **spatial):
     """

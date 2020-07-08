@@ -82,7 +82,7 @@ def _dim_shifted(tensor, axis, relative_shifts, components=None, diminish_others
     return shifted_tensors
 
 
-def _multi_roll(tensor, roll_name, relative_shifts, diminish_others=(0, 0), names=None):
+def _multi_roll(tensor, roll_name, relative_shifts, diminish_others=(0, 0), names=None, base_selection={}):
     assert isinstance(tensor, AbstractTensor), tensor
     assert len(relative_shifts) >= 2
     total_shift = max(relative_shifts) - min(relative_shifts)
@@ -90,7 +90,7 @@ def _multi_roll(tensor, roll_name, relative_shifts, diminish_others=(0, 0), name
     # --- Slice tensor to create shifts ---
     shifted_tensors = []
     for shift in relative_shifts:
-        slices = {}
+        slices = dict(base_selection)
         for name in names:
             if name == roll_name:
                 shift_start = shift - min(relative_shifts)

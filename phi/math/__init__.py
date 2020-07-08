@@ -11,7 +11,7 @@ from .nd import (spatial_rank, spatial_dimensions, all_dimensions,
                  batch_align, batch_align_scalar,
                  blur,
                  l1_loss, l2_loss, l_n_loss, frequency_loss,
-                 divergence, gradient, axis_gradient, laplace,
+                 gradient, axis_gradient, laplace,
                  fourier_laplace, fourier_poisson, fftfreq, abs_square,
                  downsample2x, upsample2x, interpolate_linear,
                  spatial_sum,)
