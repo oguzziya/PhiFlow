@@ -31,7 +31,8 @@ class AbstractTensor:
         raise NotImplementedError()
 
     def numpy(self, order=None):
-        return math.numpy(self.native(order=order))
+        native = self.native(order=order)
+        return math.numpy(native)
 
     @property
     def dtype(self):
@@ -47,7 +48,7 @@ class AbstractTensor:
 
     def __repr__(self):
         if self.shape.volume <= 4:
-            content = self.native(order=self.shape.sorted.names)  # TODO self.numpy
+            content = self.numpy(order=self.shape.sorted.names)
             content = list(math.reshape(content, [-1]))
             content = ', '.join([repr(number) for number in content])
             return "[%s, %s: %s]" % (self.dtype, self.shape, content)
@@ -198,6 +199,34 @@ class AbstractTensor:
 
     def _op1(self, native_function):
         return NativeTensor(native_function(self.native()), self.shape)
+
+    def assert_close(self, *others, rel_tolerance=1e-5, abs_tolerance=0):
+        """
+        Checks that this tensor and all other tensors have the same values.
+        Raises an AssertionError if the values of this tensor are not within tolerance of any of the other tensors.
+
+        Does not check that the shapes exactly match.
+        Tensors with different shapes are reshaped before comparing.
+
+        :param others: tensor or tensor-like (constant) each
+        :param rel_tolerance: relative tolerance
+        :param abs_tolerance: absolute tolerance
+        """
+        for other in others:
+            self._assert_close(other, rel_tolerance=rel_tolerance, abs_tolerance=abs_tolerance)
+
+    def _assert_close(self, other, rel_tolerance=1e-5, abs_tolerance=0):
+        if other is self:
+            return
+        if isinstance(other, (int, float, bool)):
+            np.testing.assert_allclose(self.numpy(), other, rel_tolerance, abs_tolerance)
+        if not isinstance(other, AbstractTensor):
+            other = tensor(other)
+        new_shape, (native1, native2) = broadcastable_native_tensors(self, other)
+        np1 = math.numpy(native1)
+        np2 = math.numpy(native2)
+        if not np.allclose(np1, np2, rel_tolerance, abs_tolerance):
+            np.testing.assert_allclose(np1, np2, rel_tolerance, abs_tolerance)
 
 
 class _TensorDim:

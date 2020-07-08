@@ -38,22 +38,30 @@ class TestTensors(TestCase):
         self.assertEqual(10, len(v.batch.unstack()))
 
     def test_native_slice(self):
-        v = tensor(np.ones([1, 4, 3, 2]))
-        v[0]
-        v0 = v.y[0:2].x[0]
-
-    def test_native_add(self):
         physics_config.x_first()
         v = tensor(np.ones([1, 4, 3, 2]))
-        v2 = v + 1
-        v2 = v + [0, 1]
+        self.assertEqual('(x=4, y=3)', repr(v[0].shape))
+        self.assertEqual('(y=2, 2)', repr(v.y[0:2].x[0].shape))
+
+    def test_native_constant_ops(self):
+        v = tensor(np.ones([1, 4, 3, 2]))
+        (v + 1).assert_close(2)
+        (v * 3.).assert_close(3)
+        (v / 2).assert_close(0.5)
+        (v ** 2).assert_close(1)
+        (2 ** v).assert_close(2)
+        (v + [0, 1]).assert_close([1, 2])
+
+    def test_native_native_ops(self):
+        v = tensor(np.ones([1, 4, 3, 2]))
         d = v.unstack()[0]
-        v + d
-        d + v
+        (v + d).assert_close(2, (d + v))
+        (v * d).assert_close(1)
 
     def test_math_functions(self):
         v = tensor(np.ones([1, 4, 3, 2]))
-        v0 = math.minimum(0, v)
+        math.maximum(0, v).assert_close(1)
+        math.maximum(0, -v).assert_close(0)
 
 
 # print(a)
