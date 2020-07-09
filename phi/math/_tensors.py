@@ -207,6 +207,12 @@ class AbstractTensor:
             new_shape, (native1, native2) = broadcastable_native_tensors(self, other)
             result_tensor = native_function(native1, native2)
             return NativeTensor(result_tensor, new_shape)
+        elif isinstance(other, Shape):
+            assert self.shape.channel.rank == 1
+            assert self.shape.channel.sizes[0] == self.shape.spatial.rank
+            sizes = other.select(*self.shape.spatial.names).sizes
+            sizes = math.as_tensor(sizes)
+            return self._op2(sizes, native_function)
         else:
             other_tensor = tensor(other, infer_dimension_types=False)
             if other_tensor.rank in (0, self.rank):
@@ -349,14 +355,14 @@ class NativeTensor(AbstractTensor):
         for name, selection in selection_dict.items():
             selections[self.shape.index(name)] = selection
             if isinstance(selection, int):
-                new_shape -= name
+                new_shape = new_shape.without(name)
         gathered = self.tensor[tuple(selections)]
         new_shape = new_shape.with_sizes(math.staticshape(gathered))
         return NativeTensor(gathered, new_shape)
 
     def unstack(self, dimension=0):
         dim_index = self.shape.index(dimension)
-        new_shape = self.shape - dimension
+        new_shape = self.shape.without(dimension)
         tensors = math.unstack(self.tensor, axis=dim_index)
         return tuple([NativeTensor(t, new_shape) for t in tensors])
 
@@ -404,7 +410,7 @@ class CollapsedTensor(AbstractTensor):
         return self._shape
 
     def unstack(self, dimension=0):
-        unstacked_shape = self.shape - dimension
+        unstacked_shape = self.shape.without(dimension)
         if dimension in self.tensor.shape:
             unstacked = self.tensor.unstack(dimension)
             return tuple(CollapsedTensor(t, unstacked_shape) for t in unstacked)
@@ -456,14 +462,14 @@ class TensorStack(AbstractTensor):
         if self._cached is not None:
             return self._cached.native(order=order)
         # Is only the stack dimension shifted?
-        if order is not None and (self._shape - self.stack_dim_name).names == tuple(filter(lambda name: name != self.stack_dim_name, order)):
+        if order is not None and self._shape.without(self.stack_dim_name).names == tuple(filter(lambda name: name != self.stack_dim_name, order)):
             native = math.stack([t.native() for t in self.tensors], axis=tuple(order).index(self.stack_dim_name))
             return native
         return self._cache().native(order=order)
 
     def _with_shape_replaced(self, new_shape):
         assert isinstance(new_shape, Shape)
-        inner_shape = new_shape - self.stack_dim_name
+        inner_shape = new_shape.without(self.stack_dim_name)
         tensors = [t._with_shape_replaced(inner_shape) for t in self.tensors]
         return TensorStack(tensors, self.stack_dim_name, new_shape.get_type(self.stack_dim_name))
 

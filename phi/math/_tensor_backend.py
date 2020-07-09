@@ -1,8 +1,9 @@
 from functools import partial
 
+from ._shape import BATCH_DIM, CHANNEL_DIM, SPATIAL_DIM
 from ..backend.backend import Backend
 from ..backend.dynamic_backend import DYNAMIC_BACKEND as math
-from ._tensors import AbstractTensor, tensor, broadcastable_native_tensors, NativeTensor
+from ._tensors import AbstractTensor, tensor, broadcastable_native_tensors, NativeTensor, CollapsedTensor, TensorStack
 
 
 class TensorBackend(Backend):
@@ -22,14 +23,11 @@ class TensorBackend(Backend):
         else:
             return x
 
-    def as_tensors(self, *objects, convert_external=True):
-        return [self.as_tensor(obj, convert_external=convert_external) for obj in objects]
-
     def copy(self, tensor, only_mutable=False):
         raise NotImplementedError()
 
     def transpose(self, tensor, axes):
-        raise NotImplementedError()
+        return CollapsedTensor(tensor, tensor.shape[axes])
 
     def equal(self, x, y):
         return x == y
@@ -41,10 +39,18 @@ class TensorBackend(Backend):
         raise NotImplementedError()
 
     def stack(self, values, axis=0):
-        raise NotImplementedError()
+        if axis == 0:
+            dim_type = BATCH_DIM
+        elif axis == -1 or axis == len(values):
+            dim_type = CHANNEL_DIM
+        else:
+            raise NotImplementedError()
+        return TensorStack(values, 'stack', dim_type)
 
     def concat(self, values, axis):
-        raise NotImplementedError()
+        tensors = broadcastable_native_tensors(values)
+        concatenated = math.concat(tensors, axis)
+        return NativeTensor(concatenated, values[0].shape)
 
     def pad(self, value, pad_width, mode='constant', constant_values=0):
         assert isinstance(value, AbstractTensor)

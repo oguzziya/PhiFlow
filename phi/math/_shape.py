@@ -80,6 +80,8 @@ class Shape:
         return self._types[self.names.index(name)]
 
     def __getitem__(self, selection):
+        if isinstance(selection, int):
+            raise NotImplementedError()
         return Shape(self._sizes[selection], self._names[selection], self._types[selection], indices=self._indices[selection])
 
     def filtered(self, boolean_mask):
@@ -96,6 +98,10 @@ class Shape:
     @property
     def batch(self):
         return self.filtered(self._types == BATCH_DIM)
+
+    def select(self, *names):
+        indices = [self.index(name) for name in names]
+        return self[indices]
 
     def __repr__(self):
         strings = ['%s=%d' % (name, size) if isinstance(name, str) else '%d' % size for size, name, type in self.dimensions]
@@ -185,7 +191,7 @@ class Shape:
         types.insert(pos, dim_type)
         return Shape(sizes, names, types)
 
-    def __sub__(self, other):
+    def without(self, other):
         if isinstance(other, (str, int)):
             return self[np.argwhere(self._names != other)[:, 0]]
         elif isinstance(other, Shape):
@@ -241,7 +247,7 @@ class Shape:
         result = self
         for name, selection in selection_dict.items():
             if isinstance(selection, int):
-                result -= name
+                result = result.without(name)
             elif isinstance(selection, slice):
                 assert selection.step is None
                 start = selection.start or 0

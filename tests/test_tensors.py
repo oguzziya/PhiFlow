@@ -21,6 +21,10 @@ class TestTensors(TestCase):
         self.assertEqual((10, 4, 5, 3, 3), define_shape(3, y=4, z=5, x=3, batch=10).sizes)
         self.assertEqual(('batch', 'y', 'z', 'x', 0), define_shape(3, y=4, z=5, x=3, batch=10).names)
 
+    def test_subshape(self):
+        shape = define_shape(2, batch=10, x=4, y=3)
+        self.assertEqual('(x=4, y=3)', repr(shape.select('x', 'y')))
+
     def test_tensor_creation(self):
         v = tensor(np.ones([1, 4, 3, 2]))
         self.assertEqual((4, 3, 2), v.shape.sizes)
@@ -122,37 +126,15 @@ class TestTensors(TestCase):
         self.assertEqual(10, len(scalar.batch.unstack()))
         self.assertEqual('()', repr(scalar.y[0].batch[0].x[0].shape))
 
+    def test_shape_math(self):
+        vector = tensor(np.ones([1, 4, 3, 2]))
+        vector *= vector.shape
+        vector[0].assert_close(4)
+        vector[1].assert_close(3)
 
 
 
-
-
-
-
-
-# print(a)
-# print(tuple(a.shape))
-# print(a[0])
-# print(a[0:1])
-# a2 = a + a
-# print(a2)
-# a3 = a2 + np.ones([1, 4, 3, 2])
-# print(a3)
-# a4 = a3 + 1
-# print(a4)
-# # print(a4.native())
-#
 # print(abs(a4).native()[0,0,0,0])
 # print((-a4).native()[0,0,0,0])
 # print(reversed(a4).native()[0,0,0,0])
-
-# print(a.x[0])
-
-
-
-# density = CenteredGrid(tensor(np.zeros([10, 4, 3, 1])))
-# density += 1
-#
-# velocity = StaggeredGrid(tensor(np.zeros([10, 5, 4, 1])))
-
 
