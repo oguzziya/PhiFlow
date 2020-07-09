@@ -200,6 +200,11 @@ class Shape:
     def with_sizes(self, sizes):
         return Shape(sizes, self._names, self._types, self._indices)
 
+    def with_size(self, name, size):
+        new_sizes = list(self._sizes)
+        new_sizes[self.index(name)] = size
+        return self.with_sizes(new_sizes)
+
     def perm(self, names):
         assert set(names) == set(self._names), 'names must match existing dimensions %s but got %s' % (self.names, names)
         perm = [self.names.index(name) for name in names]
@@ -232,9 +237,24 @@ class Shape:
         else:  # just a constant
             return sequence
 
+    def after_gather(self, selection_dict):
+        result = self
+        for name, selection in selection_dict.items():
+            if isinstance(selection, int):
+                result -= name
+            elif isinstance(selection, slice):
+                assert selection.step is None
+                start = selection.start or 0
+                stop = selection.stop or self.get_size(name)
+                if stop < 0:
+                    stop += self.get_size(name)
+                result = result.with_size(name, stop - start)
+            else:
+                raise NotImplementedError()
+        return result
 
 
-def define_shape(channels=(), batch=None, **spatial):
+def define_shape(channels=(), batch=None, infer_types_if_not_given=False, **spatial):
     """
 
     :param channels: int or (int,)
@@ -243,6 +263,8 @@ def define_shape(channels=(), batch=None, **spatial):
     :param spatial:
     :return:
     """
+    if infer_types_if_not_given and batch is None and len(spatial) == 0 and len(channels) >= 3:
+        return infer_shape(channels)
     sizes = []
     names = []
     types = []

@@ -5,10 +5,10 @@ import numpy as np
 from .. import math
 
 from ._shape import define_shape, infer_shape, CHANNEL_DIM
-from ._tensors import NativeTensor, Shape, CollapsedTensor, TensorStack, AbstractTensor
+from ._tensors import NativeTensor, Shape, CollapsedTensor, TensorStack, AbstractTensor, _remove_singleton_dimensions
 
 
-def zero(channels=(), batch=(), dtype=None, **spatial):
+def zeros(channels=(), batch=None, dtype=None, **spatial):
     """
 
     :param channels: int or (int,)
@@ -18,6 +18,8 @@ def zero(channels=(), batch=(), dtype=None, **spatial):
     :return:
     """
     zero = NativeTensor(math.zeros([], dtype=dtype), Shape((), (), ()))
-    return CollapsedTensor(zero, define_shape(channels=channels, batch=batch, **spatial))
+    tensor = CollapsedTensor(zero, define_shape(channels=channels, batch=batch, infer_types_if_not_given=True, **spatial))
+    tensor = _remove_singleton_dimensions(tensor)
+    return tensor
 
 

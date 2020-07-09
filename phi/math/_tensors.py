@@ -343,10 +343,10 @@ class NativeTensor(AbstractTensor):
     def _with_shape_replaced(self, new_shape):
         return NativeTensor(self.tensor, new_shape)
 
-    def _getitem(self, seleciton_dict):
+    def _getitem(self, selection_dict):
         new_shape = self.shape
         selections = [slice(None)] * self.rank
-        for name, selection in seleciton_dict.items():
+        for name, selection in selection_dict.items():
             selections[self.shape.index(name)] = selection
             if isinstance(selection, int):
                 new_shape -= name
@@ -368,20 +368,32 @@ class CollapsedTensor(AbstractTensor):
 
     def __init__(self, tensor, shape):
         assert isinstance(tensor, AbstractTensor)
-        for dim in tensor.shape:
-            assert dim in shape
+        shape = shape.with_linear_indices()
+        for name in tensor.shape.names:
+            assert name in shape
+        for size, name, dim_type in tensor.shape.dimensions:
+            assert shape.get_size(name) == size
+            assert shape.get_type(name) == dim_type
         self.tensor = tensor
         self._shape = shape
-        self._native = None
+        self._cached = None
+
+    def _cache(self):
+        if self._cached is None:
+            native = self.tensor.native(order=self.shape.names)
+            multiples = [1 if name in self.tensor.shape else size for size, name, _ in self.shape.dimensions]
+            tiled = math.tile(native, multiples)
+            self._cached = NativeTensor(tiled, self.shape)
+        return self._cached
 
     def native(self, order=None):
-        reordered_dimensions = [dim for dim in self.shape if dim in self.tensor.shape]
-        tensor = transpose(self.tensor, reordered_dimensions)
-
-
-
-        # TODO add missing dimensions and tile tensor
-        pass
+        if order is None or tuple(order) == self.shape.names:
+            return self._cache().native()
+        else:
+            native = self.tensor.native(order=order)
+            multiples = [1 if name in self.tensor.shape else size for size, name, _ in self.shape.dimensions]
+            tiled = math.tile(native, multiples)
+            return tiled
 
     @property
     def dtype(self):
@@ -391,16 +403,23 @@ class CollapsedTensor(AbstractTensor):
     def shape(self):
         return self._shape
 
-    def __getitem__(self, item):
-        pass
-
-    def unstack(self, dimension=None):
-        dimension = self.shape[dimension]
+    def unstack(self, dimension=0):
+        unstacked_shape = self.shape - dimension
         if dimension in self.tensor.shape:
-            raise NotImplementedError()
+            unstacked = self.tensor.unstack(dimension)
+            return tuple(CollapsedTensor(t, unstacked_shape) for t in unstacked)
         else:
-            unstacked_shape = self.shape - dimension
-            return (CollapsedTensor(self.tensor, unstacked_shape),) * dimension.size
+            return (CollapsedTensor(self.tensor, unstacked_shape),) * self.shape.get_size(dimension)
+
+    def _with_shape_replaced(self, new_shape):
+        return CollapsedTensor(self.tensor, new_shape)
+
+    def _getitem(self, selection_dict):
+        inner_dict = {name: selection for name, selection in selection_dict.items() if name in self.tensor.shape}
+        inner = self.tensor._getitem(inner_dict)
+        new_shape = self.shape.after_gather(selection_dict)
+        inner.shape.combined(new_shape)  # check that sizes match
+        return CollapsedTensor(inner, new_shape)
 
 
 class TensorStack(AbstractTensor):

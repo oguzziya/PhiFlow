@@ -1,8 +1,8 @@
 from unittest import TestCase
 from phi.flow import *
 from phi.math._shape import *
-from phi.math._tensor_initializers import zero
-from phi.math._tensors import tensor, TensorStack
+from phi.math._tensor_initializers import zeros
+from phi.math._tensors import tensor, TensorStack, CollapsedTensor
 
 import numpy as np
 
@@ -103,6 +103,27 @@ class TestTensors(TestCase):
         assert tensors[0] is stacked[0]
         assert tensors[1] is stacked[1:2].unstack()[0]
         self.assertEqual(4, len(stacked.x.unstack()))
+
+    def test_collapsed(self):
+        physics_config.x_first()
+        scalar = zeros([1, 4, 3, 1])
+        scalar.assert_close(0)
+        self.assertEqual('(x=4, y=3)', repr(scalar.shape))
+        self.assertEqual('(x=4)', repr(scalar.y[0].shape))
+        self.assertEqual('()', repr(scalar.y[0].x[0].shape))
+        self.assertEqual(3, len(scalar.y.unstack()))
+
+    def test_semi_collapsed(self):
+        physics_config.x_first()
+        scalar = tensor(np.ones([1, 4, 3, 1]))
+        scalar = CollapsedTensor(scalar, scalar.shape.plus(10, 'batch', BATCH_DIM))
+        self.assertEqual('(batch=10, x=4, y=3)', repr(scalar.shape))
+        self.assertEqual(4, len(scalar.x.unstack()))
+        self.assertEqual(10, len(scalar.batch.unstack()))
+        self.assertEqual('()', repr(scalar.y[0].batch[0].x[0].shape))
+
+
+
 
 
 
