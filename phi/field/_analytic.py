@@ -2,7 +2,7 @@ from phi.backend.backend import Backend
 from phi import math, struct
 from phi.geom.geometry import assert_same_rank
 
-from .field import Field
+from ._field import Field
 
 
 @struct.definition()

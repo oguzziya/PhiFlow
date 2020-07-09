@@ -1,6 +1,6 @@
 from phi import math
-from phi.physics.field import SampledField, ConstantField, StaggeredGrid, CenteredGrid
-from .field import StaggeredSamplePoints, Field
+from phi.field import SampledField, ConstantField, StaggeredGrid, CenteredGrid
+from ._field import StaggeredSamplePoints, Field
 
 
 def advect(field, velocity, dt):

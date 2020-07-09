@@ -15,7 +15,7 @@ import numpy as np
 import six
 from phi import struct
 from phi.data.fluidformat import Scene, write_sim_frame
-from phi.physics.field import CenteredGrid, Field, StaggeredGrid
+from phi.field import CenteredGrid, Field, StaggeredGrid
 from phi.physics.world import StateProxy, world
 from phi.viz.plot import PlotlyFigureBuilder
 

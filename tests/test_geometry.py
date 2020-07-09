@@ -3,7 +3,7 @@ from unittest import TestCase
 import numpy as np
 
 from phi.geom import AABox, Sphere, box
-from phi.physics.field import CenteredGrid
+from phi.field import CenteredGrid
 
 
 def points():

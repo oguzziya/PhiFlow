@@ -11,8 +11,8 @@ from phi.physics.material import Material
 from phi.struct.functions import mappable
 from phi.struct.tensorop import collapse
 
-from .field import Field, propagate_flags_children
-from .flag import SAMPLE_POINTS
+from ._field import Field, propagate_flags_children
+from ._flag import SAMPLE_POINTS
 
 
 def _crop_for_interpolation(data, offset_float, window_resolution):
@@ -144,7 +144,7 @@ class CenteredGrid(Field):
         if self.content_type in (struct.shape, struct.staticshape):
             return self.data[-1]
         else:
-            return self.data.shape[-1]
+            return math.staticshape(self.data)[-1]
 
     def unstack(self):
         flags = propagate_flags_children(self.flags, self.rank, 1)

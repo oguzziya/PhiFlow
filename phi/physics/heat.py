@@ -1,5 +1,5 @@
-from .field.effect import effect_applied
-from .field.util import diffuse
+from .effect import effect_applied
+from phi.field._util import diffuse
 from .physics import Physics, StateDependency
 
 

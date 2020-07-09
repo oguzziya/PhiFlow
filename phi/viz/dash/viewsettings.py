@@ -5,7 +5,7 @@ import dash_html_components as html
 from dash.dependencies import Input, Output
 
 from phi.app import App
-from phi.physics.field import Field, CenteredGrid, StaggeredGrid
+from phi.field import Field, CenteredGrid, StaggeredGrid
 from phi.viz.plot import FRONT, RIGHT, TOP
 
 

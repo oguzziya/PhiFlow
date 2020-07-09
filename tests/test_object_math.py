@@ -3,7 +3,7 @@ from unittest import TestCase
 import numpy as np
 
 from phi.flow import CLOSED, PERIODIC, OPEN, Domain, Noise
-from phi.physics.field import CenteredGrid
+from phi.field import CenteredGrid
 
 
 class TestFieldMath(TestCase):

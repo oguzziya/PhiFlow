@@ -3,8 +3,8 @@ import numbers
 import numpy
 
 from phi import math, struct
-from .flag import DIVERGENCE_FREE
-from .field import Field, propagate_flags_children
+from ._flag import DIVERGENCE_FREE
+from ._field import Field, propagate_flags_children
 
 
 @struct.definition()

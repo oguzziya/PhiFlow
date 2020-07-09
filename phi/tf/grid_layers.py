@@ -1,5 +1,5 @@
 from phi.geom import AABox
-from phi.physics.field import CenteredGrid
+from phi.field import CenteredGrid
 from . import tf
 
 

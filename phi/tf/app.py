@@ -6,7 +6,7 @@ from . import tf
 from phi.app.app import EditableFloat, EditableInt, EditableValue
 from phi.data.dataset import Dataset
 from phi.data.reader import BatchReader
-from phi.physics.field import Field, StaggeredGrid
+from phi.field import Field, StaggeredGrid
 from phi.tf.data import Dataset as TFDataset
 
 from . import TF_BACKEND

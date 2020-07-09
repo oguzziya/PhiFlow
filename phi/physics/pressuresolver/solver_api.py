@@ -2,7 +2,7 @@
 from phi import math
 from phi import struct
 from phi.physics.domain import Domain
-from phi.physics.field import CenteredGrid
+from phi.field import CenteredGrid
 from phi.physics.material import Material
 from phi.struct.functions import mappable
 

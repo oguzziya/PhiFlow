@@ -1,8 +1,8 @@
 from phi import struct
 from phi.geom.geometry import Geometry
 
-from .field import GeometryMask
-from .field.effect import FieldEffect
+from phi.field import GeometryMask
+from .effect import FieldEffect
 from .material import CLOSED, Material
 from .physics import Physics, State
 

@@ -1,9 +1,8 @@
 import warnings
 
 from phi import struct
-from .field import advect
-from .field.effect import effect_applied
-from .field.util import diffuse
+from .effect import effect_applied
+from phi.field import diffuse, advect
 from .domain import DomainState
 from .physics import Physics, StateDependency
 

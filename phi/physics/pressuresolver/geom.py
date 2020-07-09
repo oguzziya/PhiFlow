@@ -3,7 +3,7 @@ from numbers import Number
 from phi import math
 from phi.math.blas import conjugate_gradient
 from phi.math.helper import _dim_shifted
-from phi.physics.field import CenteredGrid
+from phi.field import CenteredGrid
 from .solver_api import PoissonDomain, PoissonSolver
 from phi.physics.material import Material
 

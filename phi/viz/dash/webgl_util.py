@@ -7,7 +7,7 @@ import inspect
 
 import webglviewer
 from phi.geom import GLOBAL_AXIS_ORDER as physics_config
-from phi.physics.field import CenteredGrid, StaggeredGrid
+from phi.field import CenteredGrid, StaggeredGrid
 from phi.viz.dash.dash_plotting import reduce_component
 
 

@@ -1,10 +1,9 @@
 import numpy as np
 from phi import struct, math
-from phi.physics.field import AnalyticField
-from .grid import CenteredGrid
-from .staggered_grid import StaggeredGrid
-from ..domain import Domain
-from ...backend.backend import Backend
+from phi.field import AnalyticField
+from ._grid import CenteredGrid
+from ._staggered_grid import StaggeredGrid
+from phi.physics.domain import Domain
 
 
 @struct.definition()

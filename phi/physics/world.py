@@ -12,7 +12,7 @@ from typing import TypeVar
 import six
 
 from .collective import StateCollection
-from .field.effect import Gravity
+from phi.physics.effect import Gravity
 from .physics import Physics, State, Static
 
 

@@ -13,8 +13,7 @@ import six
 import numpy as np
 from os.path import join, isfile, isdir
 
-from phi import struct, math, __version__ as phi_version
-from phi.physics import field
+from phi import struct, math, __version__ as phi_version, field
 from phi.geom import GLOBAL_AXIS_ORDER as physics_config
 
 

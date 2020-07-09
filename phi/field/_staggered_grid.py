@@ -7,9 +7,9 @@ from phi import math, struct
 from phi.geom import AABox
 from phi.geom.geometry import assert_same_rank
 from phi.struct.tensorop import collapse
-from .field import Field, propagate_flags_children, IncompatibleFieldTypes, broadcast_at, StaggeredSamplePoints, propagate_flags_resample, propagate_flags_operation
-from .grid import CenteredGrid
-from ..domain import Domain
+from ._field import Field, propagate_flags_children, IncompatibleFieldTypes, broadcast_at, StaggeredSamplePoints, propagate_flags_resample, propagate_flags_operation
+from ._grid import CenteredGrid
+from phi.physics.domain import Domain
 
 
 _SUBSCRIPTS = ['x', 'y', 'z', 'w']

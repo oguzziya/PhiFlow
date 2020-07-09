@@ -1,7 +1,7 @@
 from phi import math, struct
 from phi.geom import GLOBAL_AXIS_ORDER
 
-from .analytic import AnalyticField
+from ._analytic import AnalyticField
 
 
 @struct.definition()

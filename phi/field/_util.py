@@ -5,9 +5,9 @@ import numpy as np
 from numpy import pi
 from phi import math, struct
 from phi.geom import AABox
-from phi.physics.field import StaggeredGrid, ConstantField
-from .field import StaggeredSamplePoints, Field
-from .grid import CenteredGrid
+from phi.field import StaggeredGrid, ConstantField
+from ._field import StaggeredSamplePoints, Field
+from ._grid import CenteredGrid
 
 
 def diffuse(field, amount, substeps=1):

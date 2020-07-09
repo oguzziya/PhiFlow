@@ -3,7 +3,7 @@ import numpy as np
 from phi import math, struct
 from phi.geom import Geometry
 from phi.physics import State
-from phi.physics.field.flag import _PROPAGATOR
+from phi.field._flag import _PROPAGATOR
 
 
 def _to_valid_data(data):
@@ -209,7 +209,7 @@ class Field(State):
         return self.copied_with(data=data, flags=flags)
 
     def default_physics(self):
-        from .effect import FieldPhysics
+        from phi.physics.effect import FieldPhysics
         return FieldPhysics(self.name)
 
 

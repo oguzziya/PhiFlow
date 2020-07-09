@@ -3,7 +3,7 @@ import warnings
 import six
 
 from phi.geom import Geometry, GLOBAL_AXIS_ORDER
-from phi.physics.field import Field, mask, ConstantField
+from phi.field import Field, mask, ConstantField
 from phi import math, struct
 from phi.physics import State, Physics, StateDependency
 

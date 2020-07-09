@@ -84,7 +84,7 @@ class Domain(struct.Struct):
         return position
 
     def center_points(self):
-        from .field import CenteredGrid
+        from phi.field import CenteredGrid
         warnings.warn("Domain.center_points is deprecated. Use CenteredGrid.getpoints().data instead.", DeprecationWarning)
         return CenteredGrid.getpoints(self.box, self.resolution).data
         # idx_zyx = np.meshgrid(*[np.arange(0.5, dim + 0.5, 1) for dim in self.resolution], indexing="ij")
@@ -114,24 +114,24 @@ class Domain(struct.Struct):
 
     def centered_shape(self, components=1, batch_size=1, name=None, extrapolation=None, age=0.0):
         warnings.warn("Domain.centered_shape and Domain.centered_grid are deprecated. Use CenteredGrid.sample() instead.", DeprecationWarning)
-        from phi.physics.field import CenteredGrid
+        from phi.field import CenteredGrid
         return CenteredGrid(tensor_shape(batch_size, self.resolution, components), age=age, box=self.box, extrapolation=extrapolation, name=name, batch_size=batch_size, flags=(), content_type=struct.Struct.shape)
 
     def staggered_shape(self, batch_size=1, name=None, extrapolation=None, age=0.0):
         grids = []
         for axis in range(self.rank):
             shape = _extend1(tensor_shape(batch_size, self.resolution, 1), axis)
-            from phi.physics.field.staggered_grid import staggered_component_box
+            from phi.field import staggered_component_box
             box = staggered_component_box(self.resolution, axis, self.box)
-            from phi.physics.field import CenteredGrid
+            from phi.field import CenteredGrid
             grid = CenteredGrid(shape, box, age=age, extrapolation=extrapolation, name=None, batch_size=batch_size, flags=(), content_type=struct.Struct.shape)
             grids.append(grid)
-        from phi.physics.field import StaggeredGrid
+        from phi.field import StaggeredGrid
         return StaggeredGrid(grids, age=age, box=self.box, name=name, batch_size=batch_size, extrapolation=extrapolation, flags=(), content_type=struct.Struct.shape)
 
     def centered_grid(self, data, components=1, dtype=None, name=None, batch_size=None, extrapolation=None):
         warnings.warn("Domain.centered_shape and Domain.centered_grid are deprecated. Use CenteredGrid.sample() instead.", DeprecationWarning)
-        from phi.physics.field import CenteredGrid
+        from phi.field import CenteredGrid
         if callable(data):  # data is an initializer
             shape = self.centered_shape(components, batch_size=batch_size, name=name, extrapolation=extrapolation, age=())
             try:
@@ -153,7 +153,7 @@ class Domain(struct.Struct):
 
     def _centered_grid(self, data, components=1, dtype=None, name=None, batch_size=None, extrapolation=None):
         warnings.warn("Domain.centered_shape and Domain.centered_grid are deprecated. Use CenteredGrid.sample() instead.", DeprecationWarning)
-        from phi.physics.field import CenteredGrid
+        from phi.field import CenteredGrid
         if extrapolation is None:
             extrapolation = Material.extrapolation_mode(self.boundaries)
         if callable(data):  # data is an initializer
@@ -164,7 +164,7 @@ class Domain(struct.Struct):
                 data = data(shape)
             if data.age == ():
                 data._age = 0.0
-        from phi.physics.field import Field
+        from phi.field import Field
         if isinstance(data, Field):
             assert_same_rank(data.rank, self.rank, 'data does not match Domain')
             data = data.at(CenteredGrid.getpoints(self.box, self.resolution))
@@ -192,19 +192,19 @@ class Domain(struct.Struct):
                 data._age = 0.0
                 for field in data.data:
                     field._age = 0.0
-        from phi.physics.field import Field
+        from phi.field import Field
         if isinstance(data, Field):
-            from phi.physics.field import StaggeredGrid
+            from phi.field import StaggeredGrid
             if isinstance(data, StaggeredGrid) and np.all(data.resolution == self.resolution) and data.box == self.box:
                 grid = data
             else:
                 grid = data.at(StaggeredGrid.sample(0, self, batch_size=batch_size))  # ToDo this is not ideal
         elif isinstance(data, (int, float)):
             shape = self.staggered_shape(batch_size=batch_size, name=name, extrapolation=extrapolation)
-            from phi.physics.field import DIVERGENCE_FREE
+            from phi.field import DIVERGENCE_FREE
             grid = (math.zeros(shape, dtype=dtype) + data).copied_with(flags=[DIVERGENCE_FREE])
         else:
-            from .field import StaggeredGrid
+            from phi.field import StaggeredGrid
             grid = StaggeredGrid(data, self.box, name, batch_size=None, extrapolation=extrapolation)
         return grid
 

@@ -3,8 +3,8 @@ from phi import math, struct
 
 from . import Physics, StateDependency
 from .domain import DomainState
-from .field import AnalyticField, GeometryMask, union_mask
-from .field.effect import ADD, FieldEffect, effect_applied
+from phi.field import AnalyticField, GeometryMask, union_mask
+from .effect import ADD, FieldEffect, effect_applied
 
 
 @struct.definition()

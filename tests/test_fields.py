@@ -5,9 +5,9 @@ import numpy as np
 from phi import struct, math
 from phi.physics.domain import Domain
 from phi.geom import box, AABox
-from phi.physics.field import CenteredGrid, Field, unstack_staggered_tensor, StaggeredGrid, data_bounds, ConstantField, Noise, staggered_curl_2d
-from phi.physics.field.flag import SAMPLE_POINTS
-from phi.physics.field.staggered_grid import stack_staggered_components
+from phi.field import CenteredGrid, Field, unstack_staggered_tensor, StaggeredGrid, data_bounds, ConstantField, Noise, staggered_curl_2d
+from phi.field._flag import SAMPLE_POINTS
+from phi.field import stack_staggered_components
 from phi.physics.fluid import Fluid
 
 

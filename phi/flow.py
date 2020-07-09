@@ -7,11 +7,11 @@ from .physics.fluid import *
 from .physics.burgers import *
 from .physics.heat import *
 from .physics.worldutil import *
-from .physics.field import *
+from .field import *
 from .physics.obstacle import *
 from .physics.material import *
 from .physics.domain import *
-from .physics.field.effect import *
+from .physics.effect import *
 from .physics.pressuresolver.solver_api import PoissonDomain, PoissonSolver
 from .physics.pressuresolver.sparse import SparseCG, SparseSciPy
 from .physics.pressuresolver.geom import GeometricCG

@@ -4,11 +4,11 @@ from phi import struct, math
 from phi.geom import Sphere
 from phi.physics.domain import Domain
 
-from .field import Field
-from .grid import CenteredGrid
-from .staggered_grid import StaggeredGrid, unstack_staggered_tensor
-from .flag import SAMPLE_POINTS
-from .util import extrapolate
+from ._field import Field
+from ._grid import CenteredGrid
+from ._staggered_grid import StaggeredGrid, unstack_staggered_tensor
+from ._flag import SAMPLE_POINTS
+from ._util import extrapolate
 
 
 @struct.definition()

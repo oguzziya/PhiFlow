@@ -5,8 +5,8 @@ import numpy
 from phi import struct, math
 from phi.geom import Sphere, AABox, box
 from phi.physics.domain import Domain
-from phi.physics.field import StaggeredGrid, Noise
-from phi.physics.field.effect import Fan, Inflow
+from phi.field import StaggeredGrid, Noise
+from phi.field import Fan, Inflow
 from phi.physics.material import CLOSED, OPEN
 from phi.physics.fluid import Fluid, INCOMPRESSIBLE_FLOW, IncompressibleFlow
 from phi.physics.obstacle import Obstacle

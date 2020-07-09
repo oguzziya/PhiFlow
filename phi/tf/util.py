@@ -1,5 +1,4 @@
 # coding=utf-8
-import logging
 import warnings
 import numpy as np
 from tensorflow.python import pywrap_tensorflow
@@ -7,8 +6,8 @@ from . import tf, TF_BACKEND
 
 from phi import struct, math
 from phi.math.math_util import is_static_shape
-from phi.physics.field.staggered_grid import StaggeredGrid
-from phi.physics.field.grid import CenteredGrid
+from phi.field import StaggeredGrid
+from phi.field._grid import CenteredGrid
 
 
 def _tf_name(trace, basename):

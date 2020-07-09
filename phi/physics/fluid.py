@@ -5,16 +5,13 @@ import warnings
 from numbers import Number
 
 import numpy as np
-import six
 
 from phi import math, struct
 from phi.geom import union
-from phi.physics.field import Field, mask
-from phi.physics.field.angular_velocity import AngularVelocity
+from phi.field import Field, mask, AngularVelocity, advect, CenteredGrid, StaggeredGrid
 
 from .domain import Domain, DomainState
-from .field import CenteredGrid, StaggeredGrid, advect, union_mask
-from .field.effect import Gravity, effect_applied, gravity_tensor, FieldEffect, FieldPhysics
+from .effect import Gravity, effect_applied, gravity_tensor, FieldEffect, FieldPhysics
 from .material import OPEN, Material
 from .physics import Physics, StateDependency
 from .pressuresolver.solver_api import FluidDomain, poisson_solve

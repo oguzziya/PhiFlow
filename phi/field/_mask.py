@@ -2,8 +2,8 @@ import warnings
 
 from phi import struct, math, geom
 
-from .field import Field
-from .analytic import AnalyticField
+from ._field import Field
+from ._analytic import AnalyticField
 
 
 @struct.definition()

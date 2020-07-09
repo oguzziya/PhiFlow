@@ -1,5 +1,5 @@
-from .staggered_grid import StaggeredGrid, unstack_staggered_tensor
-from .grid import CenteredGrid
+from ._staggered_grid import StaggeredGrid, unstack_staggered_tensor
+from ._grid import CenteredGrid
 from phi import math
 from phi import geom
 
