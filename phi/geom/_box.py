@@ -4,6 +4,7 @@ from phi import struct, math
 from ._geom_util import assert_same_rank
 from ._geom import Geometry
 from ._transform import rotate
+from ..math import tensor
 
 
 @struct.definition()
@@ -99,11 +100,11 @@ class AABox(AbstractBox):
 
     @struct.constant(min_rank=1)
     def lower(self, lower):
-        return math.to_float(lower)
+        return tensor(lower)
 
     @struct.constant(min_rank=1)
     def upper(self, upper):
-        return math.to_float(upper)
+        return tensor(upper)
 
     @property
     def rank(self):
@@ -172,11 +173,11 @@ class Cuboid(AbstractBox):
 
     @struct.constant(min_rank=1)
     def center(self, center):
-        return math.to_float(center)
+        return tensor(center)
 
     @struct.constant(min_rank=1)
     def half_size(self, half_size):
-        return math.to_float(half_size)
+        return tensor(half_size)
 
     @property
     def rank(self):
@@ -222,10 +223,10 @@ class BoxGenerator(object):
         elif len(args) == 1 and 'size' in kwargs:
             center, = args
             size = kwargs['size']
-            return Cuboid(center, 0.5 * math.to_float(size))
+            return Cuboid(center, 0.5 * tensor(size))
         elif 'size' in kwargs and 'center' in kwargs:
             center, size = kwargs['center'], kwargs['size']
-            return Cuboid(center, 0.5 * math.to_float(size))
+            return Cuboid(center, 0.5 * tensor(size))
         elif len(args) == 1 and len(kwargs) == 0:
             return AABox(0, args[0])
         else:

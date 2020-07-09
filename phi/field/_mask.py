@@ -6,7 +6,6 @@ from ._field import Field
 from ._analytic import AnalyticField
 
 
-@struct.definition()
 class GeometryMask(AnalyticField):
 
     def __init__(self, geometries, antialias=False, value=None, **kwargs):
@@ -49,8 +48,3 @@ If True, field values smoothly go from 0 to 1 at the surface and the field is di
 
 
 mask = GeometryMask
-
-
-def union_mask(geometries):
-    warnings.warn("union_mask() is deprecated, use mask(union()) instead.", DeprecationWarning)
-    return mask(geom.union(*geometries))

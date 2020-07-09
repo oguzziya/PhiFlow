@@ -6,7 +6,6 @@ from ._staggered_grid import StaggeredGrid
 from phi.physics.domain import Domain
 
 
-@struct.definition()
 class Noise(AnalyticField):
     """
 Generates random noise fluctuations which can be configured in physical size and smoothness.

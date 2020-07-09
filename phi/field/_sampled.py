@@ -7,11 +7,9 @@ from phi.physics.domain import Domain
 from ._field import Field
 from ._grid import CenteredGrid
 from ._staggered_grid import StaggeredGrid, unstack_staggered_tensor
-from ._flag import SAMPLE_POINTS
 from ._util import extrapolate
 
 
-@struct.definition()
 class SampledField(Field):
 
     def __init__(self, sample_points, data=1, mode='mean', point_count=None, **kwargs):

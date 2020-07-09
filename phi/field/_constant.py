@@ -3,11 +3,9 @@ import numbers
 import numpy
 
 from phi import math, struct
-from ._flag import DIVERGENCE_FREE
-from ._field import Field, propagate_flags_children
+from ._field import Field
 
 
-@struct.definition()
 class ConstantField(Field):
 
     def __init__(self, value=1.0, name=None, **kwargs):
@@ -25,9 +23,8 @@ class ConstantField(Field):
     def component_count(self):
         return self.data.shape[-1]
 
-    def unstack(self):
-        flags = propagate_flags_children(self.flags, self.rank, 1)
-        return [ConstantField(c, '%s[%d]' % (self.name, i), flags=flags, batch_size=self._batch_size) for i, c in enumerate(math.unstack(self.data, -1))]
+    def unstack(self, dimension=0):
+        return [ConstantField(c, '%s[%d]' % (self.name, i), batch_size=self._batch_size) for i, c in enumerate(math.unstack(self.data, -1))]
 
     @property
     def points(self):

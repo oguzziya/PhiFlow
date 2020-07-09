@@ -5,7 +5,6 @@ from phi.geom.geometry import assert_same_rank
 from ._field import Field
 
 
-@struct.definition()
 class AnalyticField(Field):
 
     def __init__(self, rank, data=None, name=None, **kwargs):
@@ -104,7 +103,6 @@ class SymbolicFieldBackend(Backend):
         return isinstance(x, AnalyticField)
 
 
-@struct.definition()
 class _SymbolicOpField(AnalyticField):
 
     def __init__(self, function, function_args, **kwargs):

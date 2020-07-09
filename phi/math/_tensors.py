@@ -51,7 +51,7 @@ class AbstractTensor:
 
     def __repr__(self):
         if self.shape.volume <= 4:
-            content = self.numpy(order=self.shape.sorted.names)
+            content = self.numpy(order=self.shape.names)
             content = list(math.reshape(content, [-1]))
             content = ', '.join([repr(number) for number in content])
             return "[%s, %s: %s]" % (self.dtype, self.shape, content)
@@ -209,10 +209,13 @@ class AbstractTensor:
             return NativeTensor(result_tensor, new_shape)
         elif isinstance(other, Shape):
             assert self.shape.channel.rank == 1
-            assert self.shape.channel.sizes[0] == self.shape.spatial.rank
-            sizes = other.select(*self.shape.spatial.names).sizes
-            sizes = math.as_tensor(sizes)
-            return self._op2(sizes, native_function)
+            if self.shape.channel.sizes[0] == self.shape.spatial.rank:
+                sizes = other.select(*self.shape.spatial.names).sizes
+                sizes = math.as_tensor(sizes)
+                return self._op2(sizes, native_function)
+            else:
+                assert other.spatial.rank == self.shape.channel.volume
+                return self._op2(other.spatial.sizes, native_function)
         else:
             other_tensor = tensor(other, infer_dimension_types=False)
             if other_tensor.rank in (0, self.rank):
@@ -503,7 +506,7 @@ def _tensor(obj, infer_dimension_types=True):
     if isinstance(obj, AbstractTensor):
         return obj
     if isinstance(obj, np.ndarray) and obj.dtype != np.object:
-        if infer_dimension_types:
+        if infer_dimension_types and len(obj.shape) > 1:
             shape = infer_shape(obj.shape)
             tensor = NativeTensor(obj, shape)
             tensor = _remove_singleton_dimensions(tensor)

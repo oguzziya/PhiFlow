@@ -7,7 +7,7 @@ from phi import math, struct
 from phi.geom import AABox
 from phi.geom.geometry import assert_same_rank
 from phi.struct.tensorop import collapse
-from ._field import Field, propagate_flags_children, IncompatibleFieldTypes, broadcast_at, StaggeredSamplePoints, propagate_flags_resample, propagate_flags_operation
+from ._field import Field, IncompatibleFieldTypes, broadcast_at, StaggeredSamplePoints
 from ._grid import CenteredGrid
 from phi.physics.domain import Domain
 
@@ -53,7 +53,6 @@ def staggered_component_box(resolution, axis, box_like=None):
     return box
 
 
-@struct.definition()
 class StaggeredGrid(Field):
 
     def __init__(self, data, box=None, name=None, **kwargs):
@@ -74,7 +73,7 @@ class StaggeredGrid(Field):
         """
         return domain.staggered_grid(value, batch_size=batch_size, name=name)
 
-    @struct.variable(dependencies=[Field.name, Field.flags])
+    # @struct.variable(dependencies=[Field.name, Field.flags])
     def data(self, data):
         assert data is not None
         if math.is_tensor(data) is True:
@@ -110,7 +109,7 @@ class StaggeredGrid(Field):
     def resolution(self):
         return _res(self.data[0], 0)
 
-    @struct.constant(dependencies=Field.data)
+    # @struct.constant(dependencies=Field.data)
     def box(self, box):
         box = AABox.to_box(box, resolution_hint=self.resolution)
         assert_same_rank(len(self.data), self.box, 'StaggeredGrid.data does not match box.')

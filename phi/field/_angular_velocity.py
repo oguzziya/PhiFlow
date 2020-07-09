@@ -4,7 +4,6 @@ from phi.geom import GLOBAL_AXIS_ORDER
 from ._analytic import AnalyticField
 
 
-@struct.definition()
 class AngularVelocity(AnalyticField):
 
     def __init__(self, location, strength=1.0, **kwargs):
