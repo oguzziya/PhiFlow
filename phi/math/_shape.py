@@ -159,10 +159,20 @@ class Shape:
         return Shape(sizes, names, types)
 
     def plus(self, size, name, dim_type, pos=None):
+        """
+
+        The resulting shape has linear indices.
+
+        :param size:
+        :param name:
+        :param dim_type:
+        :param pos:
+        :return:
+        """
         if pos is None:
             same_type_dims = self.filtered(self._types == dim_type)
             if len(same_type_dims) > 0:
-                pos = same_type_dims._indices[-1] + 1
+                pos = same_type_dims._indices[0]
             else:
                 pos = {BATCH_DIM: 0, SPATIAL_DIM: self.batch.rank+1, CHANNEL_DIM: self.rank + 1}[dim_type]
         elif pos < 0:
