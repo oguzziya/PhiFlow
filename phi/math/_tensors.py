@@ -4,7 +4,7 @@ import warnings
 import numpy as np
 
 from .. import math
-from ._shape import Shape, UNKNOWN_DIM, infer_shape, CHANNEL_DIM, BATCH_DIM, SPATIAL_DIM
+from ._shape import Shape, infer_shape, CHANNEL_DIM, BATCH_DIM, SPATIAL_DIM
 
 
 class AbstractTensor:
@@ -49,7 +49,14 @@ class AbstractTensor:
     def rank(self):
         return self.shape.rank
 
+    def __len__(self):
+        assert self.rank == 1
+        return self.shape.volume
+
     def __repr__(self):
+        if self.rank == 0:
+            content = self.numpy()
+            return str(content)
         if self.shape.volume <= 4:
             content = self.numpy(order=self.shape.names)
             content = list(math.reshape(content, [-1]))
@@ -335,7 +342,7 @@ class NativeTensor(AbstractTensor):
         for name in order:
             if name not in self.shape:
                 tensor = math.expand_dims(tensor, axis=-1)
-                shape = shape.plus(1, name, UNKNOWN_DIM, pos=-1)
+                shape = shape.plus(1, name, CHANNEL_DIM, pos=-1)
         # --- Transpose ---
         perm = shape.perm(order)
         tensor = math.transpose(tensor, perm)
@@ -495,19 +502,25 @@ class TensorStack(AbstractTensor):
             return self._cache().unstack(dimension=dimension)
 
 
-def tensor(*objects, infer_dimension_types=True):
+def tensor(*objects, infer_dimension_types=True, batch_dims=None, spatial_dims=None, channel_dims=None):
     if len(objects) == 1:
-        return _tensor(objects[0], infer_dimension_types=infer_dimension_types)
+        return _tensor(objects[0], infer_dimension_types, batch_dims, spatial_dims, channel_dims)
     else:
-        return [_tensor(obj, infer_dimension_types=infer_dimension_types) for obj in objects]
+        return [_tensor(obj, infer_dimension_types, batch_dims, spatial_dims, channel_dims) for obj in objects]
 
 
-def _tensor(obj, infer_dimension_types=True):
+def _tensor(obj, infer_dimension_types=True, batch_dims=None, spatial_dims=None, channel_dims=None):
     if isinstance(obj, AbstractTensor):
+        if batch_dims is not None:
+            assert obj.shape.batch.rank == batch_dims
+        if spatial_dims is not None:
+            assert obj.shape.spatial.rank == spatial_dims
+        if channel_dims is not None:
+            assert obj.shape.channel.rank == channel_dims
         return obj
     if isinstance(obj, np.ndarray) and obj.dtype != np.object:
         if infer_dimension_types and len(obj.shape) > 1:
-            shape = infer_shape(obj.shape)
+            shape = infer_shape(obj.shape, batch_dims, spatial_dims, channel_dims)
             tensor = NativeTensor(obj, shape)
             tensor = _remove_singleton_dimensions(tensor)
             return tensor
@@ -524,6 +537,8 @@ def _tensor(obj, infer_dimension_types=True):
     if isinstance(obj, numbers.Number):
         array = np.array(obj)
         return NativeTensor(array, Shape((), (), ()))
+    if isinstance(obj, Shape):
+        return _tensor(obj.sizes)
     raise ValueError(obj)
 
 

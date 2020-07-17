@@ -5,10 +5,9 @@ import numpy as np
 from phi import math
 
 
-CHANNEL_DIM = 0
+BATCH_DIM = 0
 SPATIAL_DIM = 1
-BATCH_DIM = 2
-UNKNOWN_DIM = -1
+CHANNEL_DIM = 2
 
 
 class Shape:
