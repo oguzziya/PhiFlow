@@ -306,12 +306,59 @@ def define_shape(channels=(), batch=None, infer_types_if_not_given=False, **spat
     return Shape(sizes, names, types)
 
 
-def infer_shape(shape):
+def infer_shape(shape, batch_dims=None, spatial_dims=None, channel_dims=None):
     if isinstance(shape, Shape):
         return shape
     shape = tuple(shape)
-    assert len(shape) >= 2
+    if len(shape) == 0:
+        return Shape((), (), ())
+    # --- Infer dim types ---
+    dims = _infer_dim_group_counts(len(shape), constraints=[batch_dims, spatial_dims, channel_dims])
+    if dims is None:  # could not infer
+        channel_dims = 1
+        dims = _infer_dim_group_counts(len(shape), constraints=[batch_dims, spatial_dims, channel_dims])
+        if dims is None:
+            batch_dims = 1
+            dims = _infer_dim_group_counts(len(shape), constraints=[batch_dims, spatial_dims, channel_dims])
+    assert dims is not None, "Could not infer shape from '%s' given constraints batch_dims=%s, spatial_dims=%s, channel_dims=%s" % (shape, batch_dims, spatial_dims, channel_dims)
+    batch_dims, spatial_dims, channel_dims = dims
+    # --- Construct shape ---
     from phi import geom
-    names = ['batch'] + [geom.GLOBAL_AXIS_ORDER.axis_name(i, len(shape) - 2) for i in range(len(shape) - 2)] + [0]
-    types = [BATCH_DIM] + [SPATIAL_DIM] * (len(shape) - 2) + [CHANNEL_DIM]
+    types = [BATCH_DIM] * batch_dims + [SPATIAL_DIM] * spatial_dims + [CHANNEL_DIM] * channel_dims
+    names = []
+    if batch_dims >= 1:
+        names.append('batch')
+    for i in range(batch_dims - 1):
+        warnings.warn("infer_shape() detected more than 1 batch dimension. They will be named 'batch', 'batch2', ...")
+        names.append('batch %d' % (i+2,))
+    for i in range(spatial_dims):
+        names.append(geom.GLOBAL_AXIS_ORDER.axis_name(i, spatial_dims))
+    for i in range(channel_dims):
+        names.append(i)
     return Shape(sizes=shape, names=names, types=types)
+
+
+def _infer_dim_group_counts(rank, constraints: list):
+    known_sum = sum([dim or 0 for dim in constraints])
+    unknown_count = sum([1 if dim is None else 0 for dim in constraints])
+    if known_sum == rank:
+        return [dim or 0 for dim in constraints]
+    if unknown_count == 1:
+        return [rank - known_sum if dim is None else dim for dim in constraints]
+    return None
+
+
+def spatial_shape(sizes):
+    """
+    If `sizes` is a `Shape`, returns the spatial part of it.
+
+    Otherwise, creates a Shape with the given sizes as spatial dimensions.
+    The sizes are assumed to be ordered according to the GLOBAL_AXIS_ORDER and the dimensions are named accordingly.
+
+    :param sizes: list of integers or Shape
+    :return: Shape containing only spatial dimensions
+    """
+    if isinstance(sizes, Shape):
+        return sizes.spatial
+    else:
+        return infer_shape(sizes, batch_dims=0, channel_dims=0)

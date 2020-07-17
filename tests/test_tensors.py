@@ -25,6 +25,15 @@ class TestTensors(TestCase):
         shape = define_shape(2, batch=10, x=4, y=3)
         self.assertEqual('(x=4, y=3)', repr(shape.select('x', 'y')))
 
+    def test_infer_shape(self):
+        shape = infer_shape([1, 2, 3, 4], batch_dims=1, channel_dims=1)
+        self.assertEqual(2, shape.spatial.rank)
+        self.assertEqual(shape, infer_shape([1, 2, 3, 4]))
+        shape = infer_shape([1, 2, 3, 4], batch_dims=0, channel_dims=0)
+        self.assertEqual(4, shape.spatial.rank)
+        shape = infer_shape([1, 2, 3, 4], batch_dims=0, spatial_dims=0)
+        self.assertEqual(4, shape.channel.rank)
+
     def test_tensor_creation(self):
         v = tensor(np.ones([1, 4, 3, 2]))
         self.assertEqual((4, 3, 2), v.shape.sizes)
