@@ -1,23 +1,27 @@
-from phi import struct, math
+from phi import math
 from ._geom import Geometry
 from ._empty import NO_GEOMETRY
 from ._transform import rotate
 from ._box import bounding_box, AABox
+from ..math import combined_shape
 
 
-@struct.definition()
 class Union(Geometry):
 
-    def __init__(self, geometries, **kwargs):
-        Geometry.__init__(self, **struct.kwargs(locals()))
+    def __init__(self, geometries):
+        self._geometries = tuple(geometries)
+        assert len(self._geometries) > 0
+        for g in self._geometries[1:]:
+            assert g.rank == self._geometries[0]
+        self._shape = combined_shape(g.shape for g in geometries)
 
-    @struct.constant()
-    def geometries(self, geometries):
-        assert len(geometries) > 0
-        rank = geometries[0].rank
-        for g in geometries[1:]:
-            assert g.rank == rank or g.rank is None or rank is None
-        return tuple(geometries)
+    @property
+    def shape(self):
+        return self._shape
+
+    @property
+    def geometries(self):
+        return self._geometries
 
     @property
     def rank(self):

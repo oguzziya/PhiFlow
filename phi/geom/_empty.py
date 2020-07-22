@@ -1,11 +1,14 @@
 import numpy as np
 
-from phi import struct, math
 from ._geom import Geometry
+from ..math import Shape
 
 
-@struct.definition()
 class _NoGeometry(Geometry):
+
+    @property
+    def shape(self):
+        return Shape((), (), ())
 
     @property
     def center(self):
@@ -21,13 +24,13 @@ class _NoGeometry(Geometry):
         return None
 
     def approximate_signed_distance(self, location):
-        return math.tile(np.inf, list(math.shape(location)[:-1]) + [1])
+        return np.inf
 
     def lies_inside(self, location):
-        return math.tile(False, list(math.shape(location)[:-1]) + [1])
+        return False
 
-    def approximate_fraction_inside(self, location, cell_size):
-        return math.tile(math.to_float(0), list(math.shape(location)[:-1]) + [1])
+    def approximate_fraction_inside(self, other_geometry):
+        return 0
 
     def shifted(self, delta):
         return self

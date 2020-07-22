@@ -1,23 +1,26 @@
 import warnings
 
-from phi import struct
 from phi import math
+from phi.math import AbstractTensor
 
 
-@struct.definition()
-class Geometry(struct.Struct):
+class Geometry:
 
     @property
     def center(self):
+        """
+        :return: center location in single channel dimension, ordered according to GLOBAL_AXIS_ORDER
+        :rtype: AbstractTensor
+        """
+        raise NotImplementedError()
+
+    @property
+    def shape(self):
         raise NotImplementedError()
 
     @property
     def rank(self):
-        center = self.center
-        if math.ndims(center) > 0:
-            return math.staticshape(center)[-1]
-        else:
-            return None
+        return self.shape.spatial.rank
 
     def value_at(self, location):
         """

@@ -1,14 +1,26 @@
 import numpy as np
 
 from phi import struct, math
-from ._geom_util import assert_same_rank
+from ._geom_util import assert_same_rank, _fill_spatial_with_singleton
 from ._geom import Geometry
 from ._transform import rotate
-from ..math import tensor
+from ..math import tensor, combined_shape, spatial_shape
+from ..math._shape import CHANNEL_DIM
+from ..math._tensors import NativeTensor, TensorStack
 
 
-@struct.definition()
 class AbstractBox(Geometry):
+
+    @property
+    def shape(self):
+        raise NotImplementedError()
+
+    @property
+    def center(self):
+        raise NotImplementedError()
+
+    def shifted(self, delta):
+        raise NotImplementedError()
 
     @property
     def size(self):
@@ -88,30 +100,28 @@ For inside locations it is `-max(abs(l - s))`.
         return rotate(self, angle)
 
 
-@struct.definition(traits=[math.BATCHED])
 class AABox(AbstractBox):
     """
     Axis-aligned box, defined by lower and upper corner.
     AABoxes can be created using the shorthand notation box[slices], (e.g. box[:,0:1] to create an inifinite-height box from x=0 to x=1).
     """
 
-    def __init__(self, lower, upper, **kwargs):
-        AbstractBox.__init__(self, **struct.kwargs(locals()))
-
-    @struct.constant(min_rank=1)
-    def lower(self, lower):
-        return tensor(lower)
-
-    @struct.constant(min_rank=1)
-    def upper(self, upper):
-        return tensor(upper)
+    def __init__(self, lower, upper):
+        self._lower = tensor(lower, channel_dims=1, spatial_dims=0)
+        self._upper = tensor(upper, channel_dims=1, spatial_dims=0)
+        self._shape = _fill_spatial_with_singleton(combined_shape(self._lower, self._upper))
 
     @property
-    def rank(self):
-        if math.ndims(self.size) > 0:
-            return math.staticshape(self.size)[-1]
-        else:
-            return None
+    def shape(self):
+        return self._shape
+
+    @property
+    def lower(self):
+        return self._lower
+
+    @property
+    def upper(self):
+        return self._upper
 
     @struct.derived()
     def size(self):
@@ -132,22 +142,19 @@ class AABox(AbstractBox):
             if ax != axis:
                 lower.append(self.get_lower(ax))
                 upper.append(self.get_upper(ax))
-        return self.copied_with(lower=lower, upper=upper)
+        return AABox(lower, upper)
 
     def shifted(self, delta):
-        return self.copied_with(lower=self.lower + delta, upper=self.upper + delta)
+        return AABox(self.lower + delta, self.upper + delta)
 
     def __repr__(self):
-        if self.is_valid:
-            return '%s at (%s)' % ('x'.join([str(x) for x in self.size]), ','.join([str(x) for x in self.lower]))
-        else:
-            return struct.Struct.__repr__(self)
+        return '%s at (%s)' % ('x'.join([str(x) for x in self.size]), ','.join([str(x) for x in self.lower]))
 
     @staticmethod
     def to_box(value, resolution_hint=None):
         if value is None:
             assert resolution_hint is not None
-            result = AABox(0, resolution_hint)
+            result = AABox([0] * len(resolution_hint), tensor(resolution_hint))
         elif isinstance(value, AABox):
             result = value
         elif isinstance(value, int):
@@ -156,8 +163,6 @@ class AABox(AbstractBox):
             else:
                 size = [value] * (1 if math.ndims(resolution_hint) == 0 else len(resolution_hint))
                 result = AABox(0, size)
-        elif isinstance(value, (tuple, list)):
-            result = AABox(0, box)
         else:
             raise ValueError("Box extent not understood: '%s'" % value)
         if resolution_hint is not None:
@@ -165,41 +170,39 @@ class AABox(AbstractBox):
         return result
 
 
-@struct.definition(traits=[math.BATCHED])
 class Cuboid(AbstractBox):
 
-    def __init__(self, center, half_size, **kwargs):
-        AbstractBox.__init__(self, **struct.kwargs(locals()))
-
-    @struct.constant(min_rank=1)
-    def center(self, center):
-        return tensor(center)
-
-    @struct.constant(min_rank=1)
-    def half_size(self, half_size):
-        return tensor(half_size)
+    def __init__(self, center, half_size):
+        self._center = tensor(center)
+        self._half_size = tensor(half_size)
+        self._shape = _fill_spatial_with_singleton(combined_shape(self._center, self._half_size))
 
     @property
-    def rank(self):
-        if math.ndims(self.upper) > 0:
-            return math.staticshape(self.upper)[-1]
-        else:
-            return None
+    def center(self):
+        return self._center
 
-    @struct.derived()
+    @property
+    def half_size(self):
+        return self._half_size
+
+    @property
+    def shape(self):
+        return self._shape
+
+    @property
     def size(self):
         return 2 * self.half_size
 
-    @struct.derived()
+    @property
     def lower(self):
         return self.center - self.half_size
 
-    @struct.derived()
+    @property
     def upper(self):
         return self.center + self.half_size
 
     def shifted(self, delta):
-        return self.copied_with(center=self.center + delta)
+        return Cuboid(self._center + delta, self._half_size)
 
 
 class BoxGenerator(object):
@@ -237,3 +240,11 @@ def bounding_box(geometry):
     center = geometry.center
     extent = geometry.bounding_half_extent()
     return AABox(lower=center - extent, upper=center + extent)
+
+
+def grid_cells(resolution, box):
+    idx_zyx = np.meshgrid(*[np.linspace(0.5 / dim, 1 - 0.5 / dim, dim) for dim in resolution.sizes], indexing="ij")
+    idx = [NativeTensor(t, resolution) for t in idx_zyx]
+    local_coords = TensorStack(idx, 0, CHANNEL_DIM)
+    points = box.local_to_global(local_coords)
+    return Cuboid(points, half_size=box.size / resolution.sizes / 2)

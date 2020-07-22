@@ -1,27 +1,30 @@
 import warnings
 
-from phi import struct, math
+from phi import math
 from phi.geom import GLOBAL_AXIS_ORDER
 from ._geom import Geometry
 from ._sphere import Sphere
 
 
-@struct.definition()
 class RotatedGeometry(Geometry):
 
-    def __init__(self, geometry, angle, **kwargs):
-        Geometry.__init__(self, **struct.kwargs(locals()))
-
-    @struct.constant()
-    def geometry(self, geometry):
-        assert isinstance(geometry, Geometry)
+    def __init__(self, geometry: Geometry, angle):
         if isinstance(geometry, RotatedGeometry):
             warnings.warn('Using RotatedGeometry of RotatedGeometry. Consider simplifying your setup.')
-        return geometry
+        self._geometry = geometry
+        self._angle = angle
 
-    @struct.constant()
-    def angle(self, rotation):
-        return rotation
+    @property
+    def shape(self):
+        return self._geometry.shape
+
+    @property
+    def geometry(self):
+        return self._geometry
+
+    @property
+    def angle(self):
+        return self._angle
 
     @property
     def center(self):
@@ -66,10 +69,10 @@ class RotatedGeometry(Geometry):
         return self.geometry.rank
 
     def shifted(self, delta):
-        return self.copied_with(geometry=self.geometry.shifted(delta))
+        return RotatedGeometry(self._geometry.shifted(delta), self._angle)
 
     def rotated(self, angle):
-        return self.copied_with(angle=self.angle + angle)
+        return RotatedGeometry(self._geometry, self._angle + angle)
 
 
 def rotate(geometry, angle):

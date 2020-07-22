@@ -1,21 +1,28 @@
 from phi import math, struct
 
 from ._geom import Geometry
+from ._geom_util import _fill_spatial_with_singleton
+from ..math import tensor, combined_shape
 
 
-@struct.definition(traits=[math.BATCHED])
 class Sphere(Geometry):
 
-    def __init__(self, center, radius, **kwargs):
-        Geometry.__init__(self, **struct.kwargs(locals()))
+    def __init__(self, center, radius):
+        self._center = tensor(center, channel_dims=1, spatial_dims=0)
+        self._radius = tensor(radius, channel_dims=0, spatial_dims=0)
+        self._shape = _fill_spatial_with_singleton(combined_shape(self._center, self._radius))
 
-    @struct.constant(min_rank=0)
-    def radius(self, radius):
-        return radius
+    @property
+    def shape(self):
+        return self._shape
 
-    @struct.constant(min_rank=1)
-    def center(self, center):
-        return center
+    @property
+    def radius(self):
+        return self._radius
+
+    @property
+    def center(self):
+        return self._center
 
     def lies_inside(self, location):
         center = math.batch_align(self.center, 1, location)
@@ -44,7 +51,7 @@ Very close to the sphere center, the distance takes a constant value.
         return self.radius
 
     def shifted(self, delta):
-        return self.copied_with(center=self.center + delta)
+        return Sphere(self._center + delta, self._radius)
 
     def rotated(self, angle):
         return self

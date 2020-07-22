@@ -8,7 +8,7 @@ class AxisOrder:
         self.x = 0
         self.y = 0
         self.z = 0
-        self.x_last()
+        self.x_first()
 
     def x_first(self):
         self.is_x_first = True
