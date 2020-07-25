@@ -1,3 +1,6 @@
+from . import _extrapolation as extrapolation
+
+
 class Backend:
 
     def __init__(self, name, precision=32):
@@ -100,24 +103,22 @@ class Backend:
     def concat(self, values, axis):
         raise NotImplementedError(self)
 
-    def pad(self, value, pad_width, mode='constant', constant_values=0):
+    def pad(self, value, pad_width, mode=extrapolation.ZERO):
         """
         Pad a tensor with values as specified by `mode` and `constant_values`.
         :param value: tensor
         :param pad_width: 2D tensor specifying the number of values padded to the edges of each axis in the form [[before axis 0, after axis 0], ...] including batch and component axes.
-        :param mode: can be specified for each face, options are 'constant', 'replicate', 'circular', 'symmetric', 'reflect'
-        :param constant_values: used for out-of-bounds points if mode='constant'
+        :param mode: extrapolation
         """
         raise NotImplementedError(self)
 
-    def resample(self, inputs, sample_coords, interpolation='linear', boundary='constant', constant_values=0):
+    def resample(self, inputs, sample_coords, interpolation='linear', boundary=extrapolation.ZERO):
         """
         Interpolates a regular grid at the specified coordinates.
         :param inputs: grid data
         :param sample_coords: tensor of floating grid indices. The last dimension must match the dimensions of inputs. The first grid point of dimension i lies at position 0, the last at data.shape[i]-1.
         :param interpolation: only 'linear' is currently supported
-        :param boundary: values to use for coordinates outside the grid, can be specified for each face, options are 'constant', 'replicate', 'circular', 'symmetric', 'reflect'
-        :param constant_values: Value used for constant boundaries, can be specified for each face
+        :param boundary: extrapolation
         """
         raise NotImplementedError(self)
 

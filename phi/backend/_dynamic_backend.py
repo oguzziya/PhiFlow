@@ -1,6 +1,7 @@
 import warnings
 
-from .backend import Backend
+from . import _extrapolation as extrapolation
+from ._backend import Backend
 
 
 class NoBackendFound(Exception):
@@ -89,8 +90,8 @@ class DynamicBackend(Backend):
     def tile(self, value, multiples):
         return self.choose_backend(value).tile(value, multiples)
 
-    def pad(self, value, pad_width, mode='constant', constant_values=0):
-        return self.choose_backend(value).pad(value, pad_width, mode, constant_values)
+    def pad(self, value, pad_width, mode=extrapolation.ZERO):
+        return self.choose_backend(value).pad(value, pad_width, mode)
 
     def reshape(self, value, shape):
         return self.choose_backend(value).reshape(value, shape)
@@ -114,8 +115,8 @@ class DynamicBackend(Backend):
     def py_func(self, func, inputs, Tout, shape_out, stateful=True, name=None, grad=None):
         return self.choose_backend(inputs).py_func(func, inputs, Tout, shape_out, stateful, name, grad)
 
-    def resample(self, inputs, sample_coords, interpolation='linear', boundary='constant', constant_values=0):
-        return self.choose_backend([inputs, sample_coords]).resample(inputs, sample_coords, interpolation=interpolation, boundary=boundary, constant_values=constant_values)
+    def resample(self, inputs, sample_coords, interpolation='linear', boundary=extrapolation.ZERO):
+        return self.choose_backend([inputs, sample_coords]).resample(inputs, sample_coords, interpolation=interpolation, boundary=boundary)
 
     def range(self, start, limit=None, delta=1, dtype=None):
         return self.choose_backend([start, limit, delta]).range(start, limit, delta, dtype)
@@ -273,3 +274,18 @@ class DynamicBackend(Backend):
 
 
 DYNAMIC_BACKEND = DynamicBackend()
+
+
+def set_precision(floating_point_bits):
+    """
+    Sets the floating point precision of DYNAMIC_BACKEND which affects all registered backends.
+
+    If `floating_point_bits` is an integer, all floating point tensors created henceforth will be of the corresponding data type, float16, float32 or float64.
+    Operations may also convert floating point values to this precision, even if the input had a different precision.
+
+    If `floating_point_bits` is None, new tensors will default to float32 unless specified otherwise.
+    The output of math operations has the same precision as its inputs.
+
+    :param floating_point_bits: one of (16, 32, 64, None)
+    """
+    DYNAMIC_BACKEND.precision = floating_point_bits

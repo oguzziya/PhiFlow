@@ -3,40 +3,35 @@ from collections import namedtuple
 
 import numpy as np
 
+from . import extrapolation, Extrapolation, ConstantExtrapolation
+from ._extrapolation import PERIODIC, BOUNDARY, SYMMETRIC, REFLECT
 from .tensorop import expand, collapsed_gather_nd, CollapsedTensor as CT, collapse
 
 
-PadSettings = namedtuple('PadSettings', ['pad_width', 'mode', 'constant_values'])
+PadSettings = namedtuple('PadSettings', ['pad_width', 'mode'])
 
 
-def split_multi_mode_pad(tensor_rank, pad_settings, split_by_constant_value=True):
+def split_multi_mode_pad(tensor_rank, pad_settings):
     dims = range(tensor_rank)
-    pad_width, mode, constant_values = pad_settings
-    if isinstance(mode, six.string_types):
-        if not split_by_constant_value or not isinstance(constant_values, (tuple, list)):
-            if isinstance(constant_values, (tuple, list)):
-                constant_values = expand(constant_values, shape=(len(dims), 2))
-            pad_width = expand(pad_width, [tensor_rank, 2])
-            return [PadSettings(pad_width, mode, constant_values)]
+    pad_width, mode = pad_settings
+    if isinstance(mode, Extrapolation):
+        pad_width = expand(pad_width, [tensor_rank, 2])
+        return [PadSettings(pad_width, mode)]
     mode = expand(mode, shape=(len(dims), 2))
-    constant_values = expand(constant_values, shape=(len(dims), 2))
-    passes = [('circular', 0), ('wrap', 0), ('replicate', 0), ('symmetric', 0), ('reflect', 0)]
-    if split_by_constant_value:
-        constant_value_set = set()
-        for dim in dims:
-            for upper in (False, True):
-                constant_value_set.add(constant_values[dim][upper])
-        for const in constant_value_set:
-            passes.append(('constant', const))
-    else:
-        passes.append(('constant', constant_values))
+    passes = [PERIODIC, BOUNDARY, SYMMETRIC, REFLECT]
+    constant_value_set = set()
+    for dim in dims:
+        for upper in (False, True):
+            if isinstance(mode[dim][upper], ConstantExtrapolation):
+                constant_value_set.add(mode[dim][upper])
+        passes.extend(constant_value_set)
     result = []  # list of PadSettings
-    for single_mode, constant_value in passes:  # order matters! circular/wrap first
-        widths = [[collapsed_gather_nd(pad_width, [dim, upper]) if mode[dim][upper] == single_mode and constant_values[dim][upper] == collapsed_gather_nd(constant_value, [dim, upper]) else 0 for upper in (False, True)] for dim in dims]
+    for pass_mode in passes:  # order matters! circular/wrap first
+        widths = [[collapsed_gather_nd(pad_width, [dim, upper]) if mode[dim][upper] == pass_mode else 0 for upper in (False, True)] for dim in dims]
         if np.sum(np.array(widths)) > 0:
-            result.append(PadSettings(widths, single_mode, constant_value))
+            result.append(PadSettings(widths, pass_mode))
     if np.sum(np.array(pad_width)) > 0 and len(result) == 0:
-        split_multi_mode_pad(tensor_rank, pad_settings, split_by_constant_value=split_by_constant_value)
+        split_multi_mode_pad(tensor_rank, pad_settings)
 
     return result
 
@@ -44,7 +39,7 @@ def split_multi_mode_pad(tensor_rank, pad_settings, split_by_constant_value=True
 NeighbourReduce = namedtuple('NeighbourReduce', ['requires_weights', 'f'])
 
 
-def general_grid_sample_nd(grid, coords, boundary, constant_values, math, reduce='linear'):
+def general_grid_sample_nd(grid, coords, boundary, math, reduce='linear'):
     """
     Backend-independent grid sampling with linear interpolation.
     Supports boundary conditions per face: 'constant' , 'replicate', 'circular', 'symmetric', 'reflect'.
@@ -69,7 +64,7 @@ def general_grid_sample_nd(grid, coords, boundary, constant_values, math, reduce
             'max': NeighbourReduce(False, lambda v1, v2: math.maximum(v1, v2)),
             'minmax': NeighbourReduce(False, lambda v1, v2: (math.minimum(v1[0], v2[0]), math.maximum(v1[1], v2[1])) if isinstance(v1, tuple) else (math.minimum(v1, v2), math.maximum(v1, v2))),
         }[reduce]
-    grid, coords, boundary = pad_constant_boundaries(grid, coords, boundary, constant_values, math)
+    grid, coords, boundary = pad_constant_boundaries(grid, coords, boundary, math)
 
     resolution = np.array([int(d) for d in grid.shape[1:-1]])
     sp_rank = math.ndims(grid) - 2
@@ -101,15 +96,15 @@ def general_grid_sample_nd(grid, coords, boundary, constant_values, math, reduce
     return result
 
 
-def pad_constant_boundaries(grid, coords, boundary, constant_values, math):
+def pad_constant_boundaries(grid, coords, boundary, math):
     boundary = CT(boundary)
     spatial_rank = math.staticshape(coords)[-1]
-    pad_widths = [[1 if boundary[dim, upper] in ('zero', 'constant') else 0 for upper in (False, True)] for dim in range(-spatial_rank-1, -1)]
-    boundary = [['replicate' if boundary[dim, upper] in ('zero', 'constant') else boundary[dim, upper] for upper in (False, True)] for dim in range(-spatial_rank-1, -1)]
+    pad_widths = [[1 if isinstance(boundary[dim, upper], extrapolation.ConstantExtrapolation) else 0 for upper in (False, True)] for dim in range(-spatial_rank-1, -1)]
     lower_pads = [lu[0] for lu in pad_widths]
-    grid = math.pad(grid, [[0, 0]] + pad_widths + [[0, 0]], mode='constant', constant_values=constant_values)
+    grid = math.pad(grid, [[0, 0]] + pad_widths + [[0, 0]], boundary)
     if sum(lower_pads) > 0:
         coords = math.add(coords, math.cast(lower_pads, math.dtype(coords)))
+    boundary = [[extrapolation.BOUNDARY if isinstance(boundary[dim, upper], extrapolation.ConstantExtrapolation) else boundary[dim, upper] for upper in (False, True)] for dim in range(-spatial_rank-1, -1)]
     boundary = collapse(boundary)
     return grid, coords, boundary
 
@@ -118,7 +113,7 @@ def apply_boundary(boundary, coords, input_size, math):
     if isinstance(boundary, six.string_types):
         return _apply_single_boundary(boundary, coords, input_size, math)
     coords = math.unstack(coords, axis=-1)
-    assert len(boundary) == len(input_size) == len(coords)
+    assert len(input_size) == len(coords)
     boundary = CT(boundary)
     result = []
     for dim, dim_coords in enumerate(coords):
@@ -132,16 +127,16 @@ def apply_boundary(boundary, coords, input_size, math):
 
 
 def _apply_single_boundary(boundary, coords, input_size, math):
-    if boundary == 'zero' or boundary == 'constant':
+    if isinstance(boundary, ConstantExtrapolation):
         raise ValueError("boundary 'zero' cannot be applied to coordinates")
-    elif boundary == 'replicate':
+    elif boundary == BOUNDARY:
         return math.clip(coords, 0, input_size - 1)
-    elif boundary == 'circular':
+    elif boundary == PERIODIC:
         return math.mod(coords, input_size)
-    elif boundary == 'symmetric':
+    elif boundary == SYMMETRIC:
         coords = math.mod(coords, 2 * input_size)
         return ((2 * input_size - 1) - math.abs((2 * input_size - 1) - 2 * coords)) // 2
-    elif boundary == 'reflect':
+    elif boundary == REFLECT:
         coords = math.mod(coords, 2 * input_size - 2)
         return (input_size - 1) - math.abs((input_size - 1) - coords)
     else:

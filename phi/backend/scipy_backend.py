@@ -6,8 +6,7 @@ import numpy as np
 import scipy.signal
 import scipy.sparse
 
-from phi.backend.backend_helper import split_multi_mode_pad, PadSettings, general_grid_sample_nd
-from .backend import Backend
+from . import Backend, extrapolation, split_multi_mode_pad, PadSettings, general_grid_sample_nd
 
 
 class SciPyBackend(Backend):
@@ -30,7 +29,7 @@ class SciPyBackend(Backend):
             return True
         if isinstance(values, numbers.Number):
             return True
-        if isinstance(values, bool):
+        if isinstance(values, (bool, np.bool_)):
             return True
         if scipy.sparse.issparse(values):
             return True
@@ -108,19 +107,25 @@ class SciPyBackend(Backend):
     def concat(self, values, axis):
         return np.concatenate(values, axis)
 
-    def pad(self, value, pad_width, mode='constant', constant_values=0):
-        passes = split_multi_mode_pad(self.ndims(value), PadSettings(pad_width, mode, constant_values), split_by_constant_value=False)
+    def pad(self, value, pad_width, mode=extrapolation.ZERO):
+        passes = split_multi_mode_pad(self.ndims(value), PadSettings(pad_width, mode))
         for pad_pass in passes:
             value = self._single_mode_pad(value, *pad_pass)
         return value
 
-    def _single_mode_pad(self, value, pad_width, single_mode, constant_values=0):
-        assert single_mode in ('constant', 'symmetric', 'circular', 'reflect', 'replicate'), single_mode
-        if single_mode.lower() == 'constant':
-            return np.pad(value, pad_width, 'constant', constant_values=constant_values)
+    def _single_mode_pad(self, value, pad_width, single_mode):
+        if isinstance(single_mode, extrapolation.ConstantExtrapolation):
+            return np.pad(value, pad_width, 'constant', constant_values=single_mode.value)
         else:
-            if single_mode in ('circular', 'replicate'):
-                single_mode = {'circular': 'wrap', 'replicate': 'edge'}[single_mode]
+            if single_mode == extrapolation.BOUNDARY:
+                single_mode = 'edge'
+            elif single_mode == extrapolation.PERIODIC:
+                single_mode = 'wrap'
+            elif single_mode == extrapolation.REFLECT:
+                single_mode = 'reflect'
+            elif single_mode == extrapolation.SYMMETRIC:
+                single_mode = 'symmetric'
+            assert isinstance(single_mode, str), single_mode
             return np.pad(value, pad_width, single_mode)
 
     def reshape(self, value, shape):
@@ -147,9 +152,9 @@ class SciPyBackend(Backend):
         assert result.shape == shape_out, "returned value has wrong shape: {}, expected {}".format(result.shape, shape_out)
         return result
 
-    def resample(self, inputs, sample_coords, interpolation='linear', boundary='constant', constant_values=0):
+    def resample(self, inputs, sample_coords, interpolation='linear', boundary=extrapolation.ZERO):
         assert interpolation == 'linear'
-        return general_grid_sample_nd(inputs, sample_coords, boundary, constant_values, self)
+        return general_grid_sample_nd(inputs, sample_coords, boundary, self)
 
     def zeros_like(self, tensor):
         return np.zeros_like(tensor)
