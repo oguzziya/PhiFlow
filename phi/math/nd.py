@@ -7,10 +7,12 @@ import numpy as np
 
 from phi import struct
 from phi.backend.dynamic_backend import DYNAMIC_BACKEND as math
+from phi.backend.extrapolation import BOUNDARY, _Extrapolation
 from phi.struct.functions import mappable
-from ._shape import CHANNEL_DIM
-from ._tensors import tensor, AbstractTensor, TensorStack
+from ._shape import CHANNEL_DIM, spatial_shape, channel_shape
+from ._tensors import tensor, AbstractTensor, TensorStack, NativeTensor
 from .helper import _get_pad_width_axes, _get_pad_width, spatial_rank, _dim_shifted, _contains_axis, spatial_dimensions, all_dimensions, rank, _multi_roll
+from ..backend import extrapolation
 
 
 def indices_tensor(tensor, dtype=None):
@@ -249,17 +251,20 @@ def vector_stack(tensor_dict):
 
 # Laplace
 
-def laplace(tensor, dx=1, padding='replicate', axes=None):
+def laplace(tensor, dx=1, padding=BOUNDARY, axes=None):
     """
     Spatial Laplace operator as defined for scalar fields.
     If a vector field is passed, the laplace is computed component-wise.
 
     :param tensor: n-dimensional field of shape (batch, spacial dimensions..., components)
-    :param padding: 'valid', 'constant', 'reflect', 'replicate', 'circular'
+    :param padding: extrapolation
+    :type padding: Ex
     :param axes: The second derivative along these axes is summed over
     :type axes: list
     :return: tensor of same shape
     """
+    if isinstance(tensor, extrapolation._Extrapolation):
+        return tensor.gradient()
     return _sliced_laplace_nd(tensor, dx, padding, axes)
 
 
@@ -304,30 +309,20 @@ def fourier_poisson(tensor, times=1):
     return math.cast(math.real(math.ifft(math.divide_no_nan(frequencies, fft_laplace**times))), math.dtype(tensor))
 
 
-def fftfreq(resolution, mode='vector', dtype=None):
+def fftfreq(resolution, dtype=None):
     """
     Returns the discrete Fourier transform sample frequencies.
     These are the frequencies corresponding to the components of the result of `math.fft` on a tensor of shape `resolution`.
 
     :param resolution: grid resolution measured in cells
-    :param mode: one of (None, 'vector', 'absolute', 'square')
     :param dtype: data type of the returned tensor
     :return: tensor holding the frequencies of the corresponding values computed by math.fft
     """
-    assert mode in ('vector', 'absolute', 'square')
-    k = np.meshgrid(*[np.fft.fftfreq(int(n)) for n in resolution], indexing='ij')
-    k = math.expand_dims(math.stack(k, -1), 0)
-    if dtype is not None:
-        k = k.astype(dtype)
-    else:
-        k = math.to_float(k)
-    if mode == 'vector':
-        return k
-    k = math.sum(k**2, axis=-1, keepdims=True)
-    if mode == 'square':
-        return k
-    else:
-        return math.sqrt(k)
+    resolution = spatial_shape(resolution)
+    k = np.meshgrid(*[np.fft.fftfreq(int(n)) for n in resolution.sizes], indexing='ij')
+    k = math.stack(k, -1)
+    k = math.to_float(k) if dtype is None else k.astype(dtype)
+    return NativeTensor(k, resolution & channel_shape([resolution.rank]))
 
 
 # Downsample / Upsample

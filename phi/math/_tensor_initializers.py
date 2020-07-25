@@ -1,11 +1,8 @@
-import numbers
-
 import numpy as np
 
+from ._shape import define_shape, EMPTY_SHAPE
+from ._tensors import NativeTensor, CollapsedTensor
 from .. import math
-
-from ._shape import define_shape, infer_shape, CHANNEL_DIM
-from ._tensors import NativeTensor, Shape, CollapsedTensor, TensorStack, AbstractTensor, _remove_singleton_dimensions
 
 
 def zeros(channels=(), batch=None, dtype=None, **spatial):
@@ -17,9 +14,13 @@ def zeros(channels=(), batch=None, dtype=None, **spatial):
     :param spatial:
     :return:
     """
-    zero = NativeTensor(math.zeros([], dtype=dtype), Shape((), (), ()))
-    tensor = CollapsedTensor(zero, define_shape(channels=channels, batch=batch, infer_types_if_not_given=True, **spatial))
-    tensor = _remove_singleton_dimensions(tensor)
-    return tensor
+    shape = define_shape(channels, batch, infer_types_if_not_given=True, **spatial)
+    zero = NativeTensor(np.zeros([], dtype=dtype), EMPTY_SHAPE)
+    return CollapsedTensor(zero, shape)
 
 
+def random_normal(channels=(), batch=None, dtype=None, **spatial):
+    shape = define_shape(channels, batch, infer_types_if_not_given=True, **spatial)
+    native = np.random.randn(*shape.sizes)
+    native = math.to_float(native) if dtype is None else native.astype(dtype)
+    return NativeTensor(native, shape)

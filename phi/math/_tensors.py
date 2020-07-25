@@ -4,7 +4,7 @@ import warnings
 import numpy as np
 
 from .. import math
-from ._shape import Shape, infer_shape, CHANNEL_DIM, BATCH_DIM, SPATIAL_DIM
+from ._shape import Shape, infer_shape, CHANNEL_DIM, BATCH_DIM, SPATIAL_DIM, EMPTY_SHAPE
 
 
 class AbstractTensor:
@@ -46,31 +46,63 @@ class AbstractTensor:
         raise NotImplementedError()
 
     @property
+    def ndims(self):
+        return self.shape.rank
+
+    @property
     def rank(self):
         return self.shape.rank
 
     def __len__(self):
-        assert self.rank == 1
-        return self.shape.volume
+        return self.shape.volume if self.rank == 1 else NotImplemented
+
+    def __bool__(self):
+        return bool(self.native()) if self.rank == 0 else NotImplemented
+
+    def __int__(self):
+        return int(self.native()) if self.rank == 0 else NotImplemented
+
+    def __float__(self):
+        return float(self.native()) if self.rank == 0 else NotImplemented
+
+    def __complex__(self):
+        return complex(self.native()) if self.rank == 0 else NotImplemented
+
+    def __index__(self):
+        return int(self.native()) if self.rank == 0 and np.issubdtype(self.dtype, int) else NotImplemented
 
     def __repr__(self):
-        if self.rank == 0:
+        try:
             content = self.numpy()
+        except BaseException:
+            return "[%s  %s]" % (self.dtype, self.shape)
+        if self.rank == 0:
             return str(content)
         if self.shape.volume <= 4:
-            content = self.numpy(order=self.shape.names)
             content = list(math.reshape(content, [-1]))
             content = ', '.join([repr(number) for number in content])
-            return "[%s, %s: %s]" % (self.dtype, self.shape, content)
+            if self.rank == 1:
+                return "[%s  %s]" % (self.dtype, content)
+            else:
+                return "[%s, %s:  %s]" % (self.dtype, self.shape, content)
         else:
-            return "[%s, %s ...]" % (self.dtype, self.shape)
+            min_, max_ = np.min(content), np.max(content)
+            return "[%s, %s  %s < ... < %s]" % (self.dtype, self.shape, min_, max_)
+
+    def __str__(self):
+        return self.__repr__()
+        content = self.numpy()
+        return str(content)
 
     def __getitem__(self, item):
         if isinstance(item, (slice, int)):  # Channel dimension
             assert self.shape.channel.rank == 1
             item = {0: item}
         if isinstance(item, (tuple, list)):
-            if len(item) == self.shape.channel.rank:
+            if item[0] == Ellipsis:
+                assert len(item) - 1 == self.shape.channel.rank
+                item = {i: selection for i, selection in enumerate(item[1:])}
+            elif len(item) == self.shape.channel.rank:
                 item = {i: selection for i, selection in enumerate(item)}
             elif len(item) == self.shape.rank:  # legacy indexing
                 warnings.warn("Slicing with sequence should only be used for channel dimensions.")
@@ -110,6 +142,7 @@ class AbstractTensor:
         return [_TensorDim(self, name) for name in self.shape.names]
 
     def __getattr__(self, name):
+        print(name)
         if name in self.shape:
             return _TensorDim(self, name)
         raise AttributeError("%s has no attribute '%s'" % (self, name))
@@ -119,6 +152,9 @@ class AbstractTensor:
 
     def __sub__(self, other):
         return self._op2(other, lambda t1, t2: t1 - t2)
+
+    def __rsub__(self, other):
+        return self._op2(other, lambda t2, t1: t1 - t2)  # inverse order
 
     def __radd__(self, other):
         return self._op2(other, lambda t2, t1: t1 + t2)  # inverse order
@@ -224,7 +260,10 @@ class AbstractTensor:
                 assert other.spatial.rank == self.shape.channel.volume
                 return self._op2(other.spatial.sizes, native_function)
         else:
-            other_tensor = tensor(other, infer_dimension_types=False)
+            try:
+                other_tensor = tensor(other, infer_dimension_types=False)
+            except ValueError:
+                return NotImplemented
             if other_tensor.rank in (0, self.rank):
                 result_tensor = native_function(self.native(), other)
             elif other_tensor.rank == self.shape.channel.rank:
@@ -235,34 +274,6 @@ class AbstractTensor:
 
     def _op1(self, native_function):
         return NativeTensor(native_function(self.native()), self.shape)
-
-    def assert_close(self, *others, rel_tolerance=1e-5, abs_tolerance=0):
-        """
-        Checks that this tensor and all other tensors have the same values.
-        Raises an AssertionError if the values of this tensor are not within tolerance of any of the other tensors.
-
-        Does not check that the shapes exactly match.
-        Tensors with different shapes are reshaped before comparing.
-
-        :param others: tensor or tensor-like (constant) each
-        :param rel_tolerance: relative tolerance
-        :param abs_tolerance: absolute tolerance
-        """
-        for other in others:
-            self._assert_close(other, rel_tolerance=rel_tolerance, abs_tolerance=abs_tolerance)
-
-    def _assert_close(self, other, rel_tolerance=1e-5, abs_tolerance=0):
-        if other is self:
-            return
-        if isinstance(other, (int, float, bool)):
-            np.testing.assert_allclose(self.numpy(), other, rel_tolerance, abs_tolerance)
-        if not isinstance(other, AbstractTensor):
-            other = tensor(other)
-        new_shape, (native1, native2) = broadcastable_native_tensors(self, other)
-        np1 = math.numpy(native1)
-        np2 = math.numpy(native2)
-        if not np.allclose(np1, np2, rel_tolerance, abs_tolerance):
-            np.testing.assert_allclose(np1, np2, rel_tolerance, abs_tolerance)
 
 
 class _TensorDim:
@@ -382,8 +393,7 @@ class CollapsedTensor(AbstractTensor):
     Tiled / Repeated tensor along additional axes.
     """
 
-    def __init__(self, tensor, shape):
-        assert isinstance(tensor, AbstractTensor)
+    def __init__(self, tensor: AbstractTensor, shape: Shape):
         shape = shape.with_linear_indices()
         for name in tensor.shape.names:
             assert name in shape
@@ -444,14 +454,16 @@ class TensorStack(AbstractTensor):
     List of tensors, does not store stacked tensor in memory.
     """
 
-    def __init__(self, tensors, dim_name, dim_type):
+    def __init__(self, tensors, dim_name, dim_type, keep_separate=False):
         for tensor in tensors:
             assert isinstance(tensor, AbstractTensor)
             assert tensor.dtype == tensors[0].dtype
-            assert tensor.shape == tensors[0].shape
+            assert tensor.shape == tensors[0].shape or keep_separate
         self.tensors = tuple(tensors)
         self.stack_dim_name = dim_name
-        self._shape = tensors[0].shape.plus(len(tensors), dim_name, dim_type, pos=None)
+        self.stack_dim_type = dim_type
+        self.keep_separate = keep_separate
+        self._shape = combined_shape(*self.tensors, allow_inconsistencies=keep_separate).plus(len(tensors), dim_name, dim_type, pos=None)
         self._cached = None
 
     def _cache(self):
@@ -501,6 +513,24 @@ class TensorStack(AbstractTensor):
         else:
             return self._cache().unstack(dimension=dimension)
 
+    def _op2(self, other, native_function):
+        if self.keep_separate:
+            if isinstance(other, AbstractTensor) and self.stack_dim_name in other.shape:
+                other = other.unstack(self.stack_dim_name)
+                tensors = [t1._op2(t2, native_function) for t1, t2 in zip(self.tensors, other)]
+            else:
+                tensors = [t._op2(other, native_function) for t in self.tensors]
+            return TensorStack(tensors, self.stack_dim_name, self.stack_dim_type, self.keep_separate)
+        else:
+            return AbstractTensor._op2(self, other, native_function)
+
+    def _op1(self, native_function):
+        if self.keep_separate:
+            tensors = [t._op1(native_function) for t in self.tensors]
+            return TensorStack(tensors, self.stack_dim_name, self.stack_dim_type, self.keep_separate)
+        else:
+            return AbstractTensor._op1(self, native_function)
+
 
 def tensor(*objects, infer_dimension_types=True, batch_dims=None, spatial_dims=None, channel_dims=None):
     if len(objects) == 1:
@@ -522,7 +552,8 @@ def _tensor(obj, infer_dimension_types=True, batch_dims=None, spatial_dims=None,
         if infer_dimension_types and len(obj.shape) > 1:
             shape = infer_shape(obj.shape, batch_dims, spatial_dims, channel_dims)
             tensor = NativeTensor(obj, shape)
-            tensor = _remove_singleton_dimensions(tensor)
+            for dim in shape.non_spatial.singleton.names:
+                tensor = tensor.dimension(dim)[0]  # Remove singleton batch and channel dimensions
             return tensor
         else:
             shape = Shape(obj.shape, names=range(len(obj.shape)), types=[CHANNEL_DIM] * len(obj.shape))
@@ -536,7 +567,7 @@ def _tensor(obj, infer_dimension_types=True, batch_dims=None, spatial_dims=None,
             return TensorStack(tensor(obj), dim_name=None, dim_type=CHANNEL_DIM)
     if isinstance(obj, numbers.Number):
         array = np.array(obj)
-        return NativeTensor(array, Shape((), (), ()))
+        return NativeTensor(array, EMPTY_SHAPE)
     if isinstance(obj, Shape):
         return _tensor(obj.sizes)
     raise ValueError(obj)
@@ -549,23 +580,9 @@ def broadcastable_native_tensors(*tensors):
     :param tensors: sequence of AbstractTensors
     :return: (shape, native tensors)
     """
-    broadcast_shape = tensors[0].shape
-    for tensor in tensors[1:]:
-        broadcast_shape = broadcast_shape.combined(tensor.shape)
+    broadcast_shape = combined_shape(*tensors)
     natives = [tensor.native(order=broadcast_shape.names) for tensor in tensors]
     return broadcast_shape, natives
-
-
-def _remove_singleton_dimensions(tensor):
-    """
-    Remove singleton batch and channel dimensions
-    :type tensor: AbstractTensor
-    :rtype: AbstractTensor
-    """
-    for dim in tensor.dimensions:
-        if dim.size == 1 and (dim.is_batch or dim.is_channel):
-            return _remove_singleton_dimensions(dim[0])  # iter over old dimensions is no longer correct
-    return tensor
 
 
 def shapeof(tensor):
@@ -574,3 +591,19 @@ def shapeof(tensor):
     else:
         shape = math.staticshape(tensor)
         return infer_shape(shape)
+
+
+def combined_shape(*shapes_or_tensors, allow_inconsistencies=False):
+    assert len(shapes_or_tensors) > 0
+    shapes = []
+    for shape in shapes_or_tensors:
+        if isinstance(shape, AbstractTensor):
+            shapes.append(shape.shape)
+        elif isinstance(shape, Shape):
+            shapes.append(shape)
+        else:
+            raise ValueError("Not a shape or tensor: %s" % (shape,))
+    result = shapes[0]
+    for shape in shapes[1:]:
+        result = result.combined(shape, allow_inconsistencies=allow_inconsistencies)
+    return result

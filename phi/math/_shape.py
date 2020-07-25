@@ -67,6 +67,12 @@ class Shape:
         return item in self.names
 
     def index(self, name):
+        if name is None:
+            return None
+        if isinstance(name, (list, tuple)):
+            return tuple(self.index(n) for n in name)
+        if isinstance(name, Shape):
+            return tuple(self.index(n) for n in name._names)
         for dim_name, idx in zip(self._names, self._indices):
             if dim_name == name:
                 return idx
@@ -80,7 +86,7 @@ class Shape:
 
     def __getitem__(self, selection):
         if isinstance(selection, int):
-            raise NotImplementedError()
+            return self._sizes[selection]
         return Shape(self._sizes[selection], self._names[selection], self._types[selection], indices=self._indices[selection])
 
     def filtered(self, boolean_mask):
@@ -98,20 +104,59 @@ class Shape:
     def batch(self):
         return self.filtered(self._types == BATCH_DIM)
 
+    @property
+    def non_channel(self):
+        return self.filtered(self._types != CHANNEL_DIM)
+
+    @property
+    def non_spatial(self):
+        return self.filtered(self._types != SPATIAL_DIM)
+
+    @property
+    def non_batch(self):
+        return self.filtered(self._types != BATCH_DIM)
+
+    @property
+    def singleton(self):
+        return self.filtered(self._sizes == 1)
+
+    @property
+    def non_singleton(self):
+        return self.filtered(self._sizes != 1)
+
+    def mask(self, names):
+        if isinstance(names, (str, int)):
+            names = [names]
+        mask = [1 if name in names else 0 for name in self._names]
+        return np.array(mask)
+
     def select(self, *names):
         indices = [self.index(name) for name in names]
         return self[indices]
 
     def __repr__(self):
-        strings = ['%s=%d' % (name, size) if isinstance(name, str) else '%d' % size for size, name, type in self.dimensions]
+        strings = ['%s=%s' % (name, size) if isinstance(name, str) else '%d' % size for size, name, type in self.dimensions]
         return '(' + ', '.join(strings) + ')'
+
+    def __str__(self):
+        return repr(self)
 
     def __eq__(self, other):
         if not isinstance(other, Shape):
             return False
         return self.names == other.names and self.types == other.types and self.sizes == other.sizes
 
-    def combined(self, other):
+    def __ne__(self, other):
+        return not self == other
+
+    def normal_order(self):
+        sizes = self.batch.sizes + self.spatial.sizes + self.channel.sizes
+        names = self.batch.names + self.spatial.names + self.channel.names
+        types = self.batch.types + self.spatial.types + self.channel.types
+        indices = [self.index(name) for name in names]
+        return Shape(sizes, names, types, indices)
+
+    def combined(self, other, allow_inconsistencies=False):
         """
         Returns a Shape object that both `self` and `other` can be broadcast to.
         If `self` and `other` are incompatible, raises a ValueError.
@@ -123,14 +168,22 @@ class Shape:
         sizes = list(self.batch._sizes)
         names = list(self.batch._names)
         types = list(self.batch._types)
+
+        def _check(size, name):
+            self_size = self.get_size(name)
+            if size != self_size:
+                if not allow_inconsistencies:
+                    raise IncompatibleShapes(self, other)
+                else:
+                    sizes[names.index(name)] = None
+
         for size, name, type in other.batch.dimensions:
             if name not in names:
                 names.insert(0, name)
                 sizes.insert(0, size)
                 types.insert(0, type)
             else:
-                self_size = self.get_size(name)
-                assert size == self_size, 'Incompatible batch dimensions: %s and %s' % (self, other)
+                _check(size, name)
         # --- spatial ---
         # spatial dimensions must match exactly or one shape has none
         if self.spatial.rank == 0:
@@ -142,10 +195,13 @@ class Shape:
             names.extend(self.spatial._names)
             types.extend(self.spatial._types)
         else:
-            assert self.spatial == other.spatial, 'Incompatible spatial dimensions: %s and %s' % (self, other)
             sizes.extend(self.spatial._sizes)
             names.extend(self.spatial._names)
             types.extend(self.spatial._types)
+            if set(self.spatial.names) != set(other.spatial.names):
+                raise IncompatibleShapes(self, other)
+            for size, name, type in other.spatial.dimensions:
+                _check(size, name)
         # --- channel ---
         # channel dimensions must match exactly or one shape has none
         if self.channel.rank == 0:
@@ -157,14 +213,21 @@ class Shape:
             names.extend(self.channel._names)
             types.extend(self.channel._types)
         else:
-            assert self.channel == other.channel, 'Incompatible channel dimensions: %s and %s' % (self, other)
             sizes.extend(self.channel._sizes)
             names.extend(self.channel._names)
             types.extend(self.channel._types)
+            if set(self.channel.names) != set(other.channel.names):
+                raise IncompatibleShapes(self, other)
+            for size, name, type in other.channel.dimensions:
+                _check(size, name)
         return Shape(sizes, names, types)
+
+    def __and__(self, other):
+        return self.combined(other)
 
     def plus(self, size, name, dim_type, pos=None):
         """
+        Add a dimension to the shape.
 
         The resulting shape has linear indices.
 
@@ -195,6 +258,8 @@ class Shape:
             return self[np.argwhere(self._names != other)[:, 0]]
         elif isinstance(other, Shape):
             return self[np.argwhere([name not in other._names for name in self._names])[:, 0]]
+        elif other is None:
+            return EMPTY_SHAPE
         else:
             raise ValueError(other)
 
@@ -224,6 +289,16 @@ class Shape:
         return math.prod(self._sizes)
 
     def order(self, sequence, default=None):
+        """
+        If sequence is a dict with dimension names as keys, orders its values according to this shape.
+
+        Otherwise, the sequence is returned unchanged.
+
+        :param sequence: sequence or dict to be ordered
+        :type sequence: dict or list or tuple
+        :param default: default value used for dimensions not contained in sequence
+        :return: ordered sequence of values
+        """
         if isinstance(sequence, dict):
             result = [sequence.get(name, default) for name in self._names]
             return result
@@ -238,6 +313,9 @@ class Shape:
             return sequence[name]
         if isinstance(sequence, (tuple, list)):
             assert len(sequence) == self.rank
+            return sequence[self.names.index(name)]
+        if math.is_tensor(sequence):
+            assert math.staticshape(sequence) == (self.rank,)
             return sequence[self.names.index(name)]
         else:  # just a constant
             return sequence
@@ -259,17 +337,30 @@ class Shape:
         return result
 
 
+EMPTY_SHAPE = Shape((), (), ())
+
+
+class IncompatibleShapes(ValueError):
+    def __init__(self, shape1, shape2):
+        ValueError.__init__(self, shape1, shape2)
+
+
 def define_shape(channels=(), batch=None, infer_types_if_not_given=False, **spatial):
     """
 
     :param channels: int or (int,)
     :param batch: int or {name: int} or (Dimension,)
-    :param dtype:
+    :param infer_types_if_not_given: if True, detects legacy-style shapes, infers the corresponding types and removes singleton dimensions
     :param spatial:
     :return:
     """
+    if isinstance(channels, Shape):
+        assert batch is None
+        assert len(spatial) == 0
+        return channels
     if infer_types_if_not_given and batch is None and len(spatial) == 0 and len(channels) >= 3:
-        return infer_shape(channels)
+        shape = infer_shape(channels)
+        return shape.without(shape.non_spatial.singleton)
     sizes = []
     names = []
     types = []
@@ -310,7 +401,7 @@ def infer_shape(shape, batch_dims=None, spatial_dims=None, channel_dims=None):
         return shape
     shape = tuple(shape)
     if len(shape) == 0:
-        return Shape((), (), ())
+        return EMPTY_SHAPE
     # --- Infer dim types ---
     dims = _infer_dim_group_counts(len(shape), constraints=[batch_dims, spatial_dims, channel_dims])
     if dims is None:  # could not infer
@@ -361,3 +452,10 @@ def spatial_shape(sizes):
         return sizes.spatial
     else:
         return infer_shape(sizes, batch_dims=0, channel_dims=0)
+
+
+def channel_shape(sizes):
+    if isinstance(sizes, Shape):
+        return sizes.channel
+    else:
+        return infer_shape(sizes, batch_dims=0, spatial_dims=0)

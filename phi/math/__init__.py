@@ -1,11 +1,13 @@
 from phi.backend.backend import Backend
 from phi.backend.dynamic_backend import DYNAMIC_BACKEND
 from phi.backend.scipy_backend import SciPyBackend
+from phi.backend import extrapolation as extrapolation
 from phi.struct.struct_backend import StructBroadcastBackend
 from ._tensor_backend import TensorBackend
-from ._shape import Shape, define_shape
-from ._tensors import tensor, AbstractTensor
-from .math_util import types, is_static_shape, zeros, ones, randn, randfreq
+from ._shape import Shape, define_shape, spatial_shape, infer_shape
+from ._tensors import tensor, AbstractTensor, combined_shape
+from ._tensor_initializers import zeros
+from ._tensor_functions import close, assert_close
 from .helper import is_scalar, axes, rank
 from .nd import (spatial_rank, spatial_dimensions, all_dimensions,
                  indices_tensor,
