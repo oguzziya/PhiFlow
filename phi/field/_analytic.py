@@ -25,6 +25,9 @@ class AnalyticField(Field, ABC):
     def _op2(self, other, operator):
         pass
 
+    def _op1(self, operator):
+        pass
+
 
 class SymbolicFieldBackend(Backend):
     # Abstract mehtods are overridden generically.

@@ -1,7 +1,8 @@
 import numpy as np
 
-from ._geom import Geometry
+from phi import math
 from ..math._shape import EMPTY_SHAPE
+from ._geom import Geometry
 
 
 class _NoGeometry(Geometry):
@@ -20,17 +21,14 @@ class _NoGeometry(Geometry):
     def bounding_half_extent(self):
         return 0
 
-    def rank(self):
-        return None
-
     def approximate_signed_distance(self, location):
-        return np.inf
+        return math.zeros(location.shape.non_channel) + np.inf
 
     def lies_inside(self, location):
-        return False
+        return math.zeros(location.shape.non_channel, dtype=bool)
 
     def approximate_fraction_inside(self, other_geometry):
-        return 0
+        return math.zeros(other_geometry.shape)
 
     def shifted(self, delta):
         return self

@@ -10,7 +10,7 @@ import tensorflow as tf
 from packaging import version
 
 from phi.backend.backend_helper import split_multi_mode_pad, PadSettings, general_grid_sample_nd, equalize_shapes, circular_pad, replicate_pad
-from phi.backend.scipy_backend import SciPyBackend
+from phi.backend.scipy_backend import SciPyBackend, SCIPY_BACKEND
 from phi.tf.tf_cuda_resample import *
 from . import tf
 
@@ -28,7 +28,7 @@ class TFBackend(Backend):
         return {16: np.float16, 32: np.float32, 64: np.float64, None: np.float32}[self.precision]
 
     def is_tensor(self, x, only_native=False):
-        if not only_native and SciPyBackend().is_tensor(x, only_native=False):
+        if not only_native and SCIPY_BACKEND.is_tensor(x, only_native=False):
             return True
         return isinstance(x, (tf.Tensor, tf.Variable, tf.SparseTensor, tf.Operation))
 

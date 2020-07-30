@@ -1,9 +1,9 @@
 from phi.flow import *
-# physics_config.x_first()
 
 domain = Domain([80, 64], boundaries=CLOSED)
 dt = 1.0
 buoyancy_factor = 0.1
+
 velocity = domain.staggered_grid(0)
 density = domain.grid(0)
 inflow = field.resample(mask(Sphere(center=(10, 32), radius=5)), density) * 0.2

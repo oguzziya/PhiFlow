@@ -8,7 +8,7 @@ import numpy as np
 
 from phi import math, struct
 from phi.geom import union
-from phi.field import Field, mask, AngularVelocity, advect, CenteredGrid, StaggeredGrid
+from phi.field import Field, mask, AngularVelocity, advect, CenteredGrid, StaggeredGrid, resample
 
 from .domain import Domain, DomainState
 from .effect import Gravity, effect_applied, gravity_tensor, FieldEffect, FieldPhysics
@@ -226,11 +226,11 @@ Projects the given velocity field by solving for and subtracting the pressure.
         domain = Domain(velocity.resolution, OPEN)
     obstacle_mask = mask(union([obstacle.geometry for obstacle in obstacles]), antialias=False)
     if obstacle_mask is not None:
-        obstacle_grid = obstacle_mask.at(velocity.center_points).copied_with(extrapolation='constant')
+        obstacle_grid = CenteredGrid.sample(obstacle_mask, domain.resolution, domain.box, math.extrapolation.ZERO)
         active_mask = 1 - obstacle_grid
     else:
-        active_mask = math.ones(domain.centered_shape(name='active', extrapolation='constant'))
-    accessible_mask = active_mask.copied_with(extrapolation=Material.accessible_extrapolation_mode(domain.boundaries))
+        active_mask = math.ones(domain.centered_shape(extrapolation=math.extrapolation.ZERO))
+    accessible_mask = CenteredGrid(active_mask.data, active_mask.box, Material.accessible_extrapolation_mode(domain.boundaries))
     fluiddomain = FluidDomain(domain, active=active_mask, accessible=accessible_mask)
     # --- Boundary Conditions, Pressure Solve ---
     velocity = fluiddomain.with_hard_boundary_conditions(velocity)

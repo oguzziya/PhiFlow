@@ -194,10 +194,6 @@ def einsum(equation, *tensors):
     raise NotImplementedError()
 
 
-def while_loop(cond, body, loop_vars, shape_invariants=None, parallel_iterations=10, back_prop=True, swap_memory=False, name=None, maximum_iterations=None):
-    raise NotImplementedError()
-
-
 def abs(x: AbstractTensor):
     return x._op1(math.abs)
 
@@ -219,15 +215,15 @@ def floor(x: AbstractTensor):
 
 
 def max(x, axis=None):
-    if axis is None:
-        return math.max(x.native())
-    raise NotImplementedError()
+    x = tensor(x)
+    result = math.max(x.native(), x.shape.index(axis), keepdims=False)
+    return NativeTensor(result, x.shape.without(axis))
 
 
 def min(x, axis=None):
-    if axis is None:
-        return math.min(x.native())
-    raise NotImplementedError()
+    x = tensor(x)
+    result = math.min(x.native(), x.shape.index(axis), keepdims=False)
+    return NativeTensor(result, x.shape.without(axis))
 
 
 def maximum(a, b):
@@ -241,7 +237,7 @@ def minimum(a, b):
 
 
 def clip(x, minimum, maximum):
-    new_shape, (x_, min_, max_) = broadcastable_native_tensors(tensor(x, minimum, maximum))
+    new_shape, (x_, min_, max_) = broadcastable_native_tensors(*tensor(x, minimum, maximum))
     assert new_shape == x.shape, 'Not implemented'
     result_tensor = math.clip(x_, min_, max_)
     return NativeTensor(result_tensor, new_shape)
@@ -349,11 +345,11 @@ def cast(x, dtype):
 
 
 def sin(x):
-    raise NotImplementedError()
+    return tensor(x)._op1(math.sin)
 
 
 def cos(x):
-    raise NotImplementedError()
+    return tensor(x)._op1(math.cos)
 
 
 def dtype(x):

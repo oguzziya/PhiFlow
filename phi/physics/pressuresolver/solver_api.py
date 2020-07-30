@@ -67,10 +67,7 @@ class PoissonDomain(struct.Struct):
         if active is not None:
             assert isinstance(active, CenteredGrid)
             assert active.rank == self.domain.rank
-            assert active.component_count == 1
-            if active.extrapolation != extrapolation:
-                active = active.copied_with(extrapolation=extrapolation)
-            return active
+            return CenteredGrid(active.data, active.box, extrapolation)
         else:
             return self.domain.centered_grid(1, extrapolation=extrapolation)
 
@@ -79,7 +76,6 @@ class PoissonDomain(struct.Struct):
         if accessible is not None:
             assert isinstance(accessible, CenteredGrid)
             assert accessible.rank == self.domain.rank
-            assert accessible.component_count == 1
             return accessible
         else:
             return self.domain.centered_grid(1, extrapolation=Material.extrapolation_mode(self.domain.boundaries))
@@ -127,7 +123,7 @@ FluidDomain = PoissonDomain
 
 @mappable()
 def _active_extrapolation(boundaries):
-    return 'periodic' if boundaries == 'periodic' else 'constant'
+    return math.extrapolation.PERIODIC if boundaries == math.extrapolation.PERIODIC else math.extrapolation.ZERO
 
 
 def poisson_solve(input_field, poisson_domain, solver=None, guess=None, gradient='implicit'):

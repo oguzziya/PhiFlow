@@ -24,7 +24,6 @@ from ._tensor_math import (
     dot,
     matmul,
     einsum,
-    while_loop,
     abs,
     sign,
     round, ceil, floor,

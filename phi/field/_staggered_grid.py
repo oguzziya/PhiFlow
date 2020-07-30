@@ -60,10 +60,6 @@ class StaggeredGrid(Grid):
                 tensors.append(math.zeros(comp_res) + value)
             return StaggeredGrid(math.channel_stack(tensors), box, extrapolation)
 
-    @property
-    def data(self):
-        return self._data
-
     def with_data(self, data):
         if isinstance(data, StaggeredGrid):
             return StaggeredGrid(data._data, self._box, self._extrapolation)

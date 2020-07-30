@@ -63,12 +63,8 @@ class CenteredGrid(Grid):
     @staticmethod
     def sample(value, resolution, box, extrapolation=math.extrapolation.ZERO):
         if isinstance(value, Field):
-            assert_same_rank(value.rank, box.rank, 'rank of value (%s) does not match domain (%s)' % (value.rank, box.rank))
-            if isinstance(value, CenteredGrid) and value.box == box and np.all(value.resolution == resolution):
-                data = value.data
-            else:
-                point_field = CenteredGrid(math.zeros(resolution), box)
-                data = resample(value, point_field).data
+            elements = GridCell(resolution, box)
+            data = value.sample_at(elements)
         else:
             if callable(value):
                 x = GridCell(resolution, box).center
@@ -96,11 +92,15 @@ class CenteredGrid(Grid):
         return GridCell(self.resolution, self._box)
 
     def sample_at(self, points, reduce_channels=()):
-        if isinstance(points, (tuple, list)) and len(points) == 1:
-            raise NotImplementedError()
-        if isinstance(points, CenteredGrid):
-            points = points.data
-        if isinstance(points, Geometry):
+        if isinstance(points, (tuple, list)):
+            return tuple(self.sample_at(p) for p in points)
+        elif isinstance(points, GridCell) and points.bounds == self.box and points.resolution == self.resolution:
+            return self._data
+        elif isinstance(points, GridCell) and math.close(self.dx, points.size):
+            fast_resampled = self._shift_resample(points.resolution, points.bounds)
+            if fast_resampled != NotImplemented:
+                return fast_resampled
+        elif isinstance(points, Geometry):
             points = points.center
         local_points = self.box.global_to_local(points)
         local_points = local_points * self.resolution - 0.5
@@ -115,19 +115,15 @@ class CenteredGrid(Grid):
                 channels.append(math.resample(channel, local_points[{reduce_channels[0]: i}], 'linear', self.extrapolation))
             return math.channel_stack(channels)
 
-    def _resample_to(self, representation: Field) -> Field:
-        if self.compatible(representation):
-            return self
-        if isinstance(representation, CenteredGrid) and math.close(self.dx, representation.dx):
-            paddings = _required_paddings_transposed(self.box, self.dx, representation.box)
-            if math.sum(paddings) == 0:
-                origin_in_local = self.box.global_to_local(representation.box.lower) * self.resolution
-                data = math.interpolate_linear(self._data, origin_in_local, representation.resolution.sizes)
-                return CenteredGrid(data, representation.box)
-            elif math.sum(paddings) < 16:
-                padded = self.padded(np.transpose(paddings).tolist())
-                return padded.at(representation)
-        return NotImplemented
+    def _shift_resample(self, resolution, box):
+        paddings = _required_paddings_transposed(self.box, self.dx, box)
+        if math.sum(paddings) == 0:
+            origin_in_local = self.box.global_to_local(box.lower) * self.resolution
+            data = math.interpolate_linear(self._data, origin_in_local, resolution.sizes)
+            return CenteredGrid(data, box)
+        elif math.sum(paddings) < 16:
+            padded = self.padded(np.transpose(paddings).tolist())
+            return padded.at(representation)
 
     def general_sample_at(self, points, reduce):
         local_points = self.box.global_to_local(points)

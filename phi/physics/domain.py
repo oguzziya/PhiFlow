@@ -53,6 +53,7 @@ class Domain:
     def dx(self):
         return self.box.size / self.resolution
 
+    @property
     def cells(self):
         return GridCell(self.resolution, self.box)
 
