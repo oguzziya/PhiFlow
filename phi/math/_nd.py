@@ -6,12 +6,13 @@ import warnings
 import numpy as np
 
 from phi import struct
-from phi.backend.dynamic_backend import DYNAMIC_BACKEND as math
-from phi.backend.extrapolation import BOUNDARY, _Extrapolation
+from phi.backend import Extrapolation
 from phi.struct.functions import mappable
+from . import _tensor_math as math
 from ._shape import CHANNEL_DIM, spatial_shape, channel_shape
+from ._tensor_math import broadcast_op
 from ._tensors import tensor, AbstractTensor, TensorStack, NativeTensor
-from .helper import _get_pad_width_axes, _get_pad_width, spatial_rank, _dim_shifted, _contains_axis, spatial_dimensions, all_dimensions, rank, _multi_roll
+from ._helper import _get_pad_width_axes, _get_pad_width, _dim_shifted, _contains_axis, _multi_roll
 from ..backend import extrapolation
 
 
@@ -47,62 +48,6 @@ def normalize_to(target, source=1, epsilon=1e-5, batch_dims=1):
     denominator = math.maximum(target_total, epsilon) if epsilon is not None else target_total
     source_total = math.sum(source, axis=tuple(range(batch_dims, math.ndims(source))), keepdims=True)
     return target * (source_total / denominator)
-
-
-def batch_align(tensor, innate_dims, target, convert_to_same_backend=True):
-    if isinstance(tensor, (tuple, list)):
-        return [batch_align(t, innate_dims, target) for t in tensor]
-    # --- Convert type ---
-    if convert_to_same_backend:
-        backend = math.choose_backend([tensor, target])
-        tensor = backend.as_tensor(tensor)
-        target = backend.as_tensor(target)
-    # --- Batch align ---
-    ndims = len(math.staticshape(tensor))
-    if ndims <= innate_dims:
-        return tensor  # There is no batch dimension
-    target_ndims = len(math.staticshape(target))
-    assert target_ndims >= ndims
-    if target_ndims == ndims:
-        return tensor
-    return math.expand_dims(tensor, axis=(-innate_dims - 1), number=(target_ndims - ndims))
-
-
-def batch_align_scalar(tensor, innate_spatial_dims, target):
-    if rank(tensor) == 0:
-        assert innate_spatial_dims == 0
-        return math.expand_dims(tensor, 0, len(math.staticshape(target)))
-    if math.staticshape(tensor)[-1] != 1 or math.ndims(tensor) <= 1:
-        tensor = math.expand_dims(tensor, -1)
-    result = batch_align(tensor, innate_spatial_dims + 1, target)
-    return result
-
-
-def blur(field, radius, cutoff=None, kernel="1/1+x"):
-    """
-Warning: This function can cause NaN in the gradients, reason unknown.
-
-Runs a blur kernel over the given tensor.
-    :param field: tensor
-    :param radius: weight function curve scale
-    :param cutoff: kernel size
-    :param kernel: Type of blur kernel (str). Must be in ('1/1+x', 'gauss')
-    :return:
-    """
-    if cutoff is None:
-        cutoff = min(int(round(radius * 3)), *field.shape[1:-1])
-
-    xyz = np.meshgrid(*[range(-int(cutoff), (cutoff) + 1) for _ in field.shape[1:-1]])
-    d = math.to_float(np.sqrt(np.sum([x**2 for x in xyz], axis=0)))
-    if kernel == "1/1+x":
-        weights = math.to_float(1) / (d / radius + 1)
-    elif kernel.lower() == "gauss":
-        weights = math.exp(- d / radius / 2)
-    else:
-        raise ValueError("Unknown kernel: %s" % kernel)
-    weights /= math.sum(weights)
-    weights = math.reshape(weights, list(weights.shape) + [1, 1])
-    return math.conv(field, weights)
 
 
 def l1_loss(tensor, batch_norm=True, reduce_batches=True):
@@ -232,16 +177,6 @@ def _gradient_nd(x_, padding, relative_shifts, axes):
         return result.native()
 
 
-def axis_gradient(tensor, spatial_axis):
-    warnings.warn("axis_gradient is deprecated, use gradient(axes=('x',) instead")
-    dims = range(spatial_rank(tensor))
-    upper_slices = tuple([(slice(1, None) if i == spatial_axis else slice(None)) for i in dims])
-    lower_slices = tuple([(slice(-1) if i == spatial_axis else slice(None)) for i in dims])
-    diff = tensor[(slice(None),) + upper_slices + (slice(None),)] \
-        - tensor[(slice(None),) + lower_slices + (slice(None),)]
-    return diff
-
-
 def vector_stack(tensor_dict):
     shape = next(iter(tensor_dict.values())).shape
     ordered_names = sorted(tensor_dict.keys(), key=lambda name: shape.index(name))
@@ -251,7 +186,7 @@ def vector_stack(tensor_dict):
 
 # Laplace
 
-def laplace(tensor, dx=1, padding=BOUNDARY, axes=None):
+def laplace(tensor, dx=1, padding=extrapolation.BOUNDARY, axes=None):
     """
     Spatial Laplace operator as defined for scalar fields.
     If a vector field is passed, the laplace is computed component-wise.
@@ -263,9 +198,9 @@ def laplace(tensor, dx=1, padding=BOUNDARY, axes=None):
     :type axes: list
     :return: tensor of same shape
     """
-    if isinstance(tensor, extrapolation._Extrapolation):
+    if isinstance(tensor, Extrapolation):
         return tensor.gradient()
-    return _sliced_laplace_nd(tensor, dx, padding, axes)
+    return broadcast_op(lambda t: _sliced_laplace_nd(t, dx, padding, axes), [tensor])
 
 
 def _sliced_laplace_nd(x_, dx, padding, axes=None):
@@ -307,22 +242,6 @@ def fourier_poisson(tensor, times=1):
     fft_laplace = -(2 * np.pi)**2 * k
     fft_laplace[(0,) * math.ndims(k)] = np.inf
     return math.cast(math.real(math.ifft(math.divide_no_nan(frequencies, fft_laplace**times))), math.dtype(tensor))
-
-
-def fftfreq(resolution, dtype=None):
-    """
-    Returns the discrete Fourier transform sample frequencies.
-    These are the frequencies corresponding to the components of the result of `math.fft` on a tensor of shape `resolution`.
-
-    :param resolution: grid resolution measured in cells
-    :param dtype: data type of the returned tensor
-    :return: tensor holding the frequencies of the corresponding values computed by math.fft
-    """
-    resolution = spatial_shape(resolution)
-    k = np.meshgrid(*[np.fft.fftfreq(int(n)) for n in resolution.sizes], indexing='ij')
-    k = math.stack(k, -1)
-    k = math.to_float(k) if dtype is None else k.astype(dtype)
-    return NativeTensor(k, resolution & channel_shape([resolution.rank]))
 
 
 # Downsample / Upsample
@@ -374,18 +293,17 @@ def spatial_sum(tensor):
     return summed
 
 
-def interpolate_linear(tensor, upper_weight, dimensions):
-    """
-
-    :param tensor:
-    :param upper_weight: tensor of floats (leading dimensions must be 1) or nan to ignore interpolation along this axis
-    :param dimensions: list or tuple of dimensions (first spatial axis=1) to be interpolated. Other axes are ignored.
-    :return:
-    """
+def interpolate_linear(tensor: AbstractTensor, start, size):
+    for sta, siz, dim in zip(start, size, tensor.shape.spatial.names):
+        tensor = tensor.dimension(dim)[int(sta):int(sta)+siz + (1 if sta != 0 else 0)]
+    upper_weight = start % 1
     lower_weight = 1 - upper_weight
-    for dimension in spatial_dimensions(tensor):
-        if dimension in dimensions:
-            upper_slices = tuple([(slice(1, None) if i == dimension else slice(None)) for i in all_dimensions(tensor)])
-            lower_slices = tuple([(slice(-1) if i == dimension else slice(None)) for i in all_dimensions(tensor)])
-            tensor = math.mul(tensor[upper_slices], upper_weight[..., dimension - 1]) + math.mul(tensor[lower_slices], lower_weight[..., dimension - 1])
+    for i, dimension in tensor.shape.spatial.enumerated_names:
+        if upper_weight[i] not in (0, 1):
+            lower, upper = _multi_roll(tensor, dimension, (0, 1), names=tensor.shape.spatial.names)
+            tensor = upper * upper_weight[i] + lower * lower_weight[i]
     return tensor
+
+
+def vec_abs(tensor: AbstractTensor):
+    return math.sqrt(math.sum(tensor ** 2, axis=tensor.shape.channel.names))

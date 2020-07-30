@@ -1,33 +1,6 @@
 from phi.math._tensors import AbstractTensor
 from phi.struct.tensorop import collapsed_gather_nd
 
-from phi.backend.dynamic_backend import DYNAMIC_BACKEND as math
-
-
-def rank(tensor):
-    return len(math.staticshape(tensor))
-
-
-def spatial_rank(tensor):
-    """ The spatial rank of a tensor is ndims - 2. """
-    return math.ndims(tensor) - 2
-
-
-def spatial_dimensions(obj):
-    return tuple(range(1, len(math.staticshape(obj)) - 1))
-
-
-def axes(obj):
-    return tuple(range(len(math.staticshape(obj)) - 2))
-
-
-def all_dimensions(tensor):
-    return range(len(math.staticshape(tensor)))
-
-
-def is_scalar(tensor):
-    return math.ndims(tensor) == 0
-
 
 def _get_pad_width_axes(rank, axes, val_true=(1, 1), val_false=(0, 0)):
     mid_shape = []

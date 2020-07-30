@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import warnings
 
 import numpy as np
@@ -60,6 +62,10 @@ class Shape:
     def indexed_dimensions(self):
         return zip(self._indices, self._sizes, self._names, self._types)
 
+    @property
+    def enumerated_names(self):
+        return zip(range(len(self)), self._names)
+
     def __len__(self):
         return len(self.sizes)
 
@@ -79,7 +85,12 @@ class Shape:
         raise ValueError("Shape %s does not contain dimension with name '%s'" % (self, name))
 
     def get_size(self, name):
-        return self._sizes[self.names.index(name)]
+        if isinstance(name, (str, int)):
+            return self._sizes[self.names.index(name)]
+        elif isinstance(name, (tuple, list)):
+            return tuple(self.get_size(n) for n in name)
+        else:
+            raise ValueError(name)
 
     def get_type(self, name):
         return self._types[self.names.index(name)]
@@ -89,7 +100,7 @@ class Shape:
             return self._sizes[selection]
         return Shape(self._sizes[selection], self._names[selection], self._types[selection], indices=self._indices[selection])
 
-    def filtered(self, boolean_mask):
+    def filtered(self, boolean_mask) -> Shape:
         return self[np.argwhere(boolean_mask)[:, 0]]
 
     @property
@@ -97,7 +108,7 @@ class Shape:
         return self.filtered(self._types == CHANNEL_DIM)
 
     @property
-    def spatial(self):
+    def spatial(self) -> Shape:
         return self.filtered(self._types == SPATIAL_DIM)
 
     @property
@@ -256,6 +267,8 @@ class Shape:
     def without(self, other):
         if isinstance(other, (str, int)):
             return self[np.argwhere(self._names != other)[:, 0]]
+        if isinstance(other, (tuple, list)):
+            return self[np.argwhere([name not in other for name in self._names])[:, 0]]
         elif isinstance(other, Shape):
             return self[np.argwhere([name not in other._names for name in self._names])[:, 0]]
         elif other is None:
@@ -266,6 +279,10 @@ class Shape:
     @property
     def rank(self):
         return len(self.sizes)
+
+    @property
+    def well_defined(self):
+        return None not in self._sizes
 
     def with_sizes(self, sizes):
         return Shape(sizes, self._names, self._types, self._indices)
@@ -286,6 +303,8 @@ class Shape:
         Returns the total number of values contained in a tensor of this shape.
         This is the product of all dimension sizes.
         """
+        if None in self._sizes:
+            return None
         return math.prod(self._sizes)
 
     def order(self, sequence, default=None):
