@@ -5,12 +5,12 @@ import numpy as np
 from numpy import pi
 from phi import math, struct
 from phi.geom import AABox
-from phi.field import StaggeredGrid, ConstantField
-from ._field import StaggeredSamplePoints, Field
-from ._grid import CenteredGrid
+from phi.field import StaggeredGrid, ConstantField, Grid, CenteredGrid
+from ._field import Field
+from ._field_math import laplace, squared, fftfreq, fft, ifft, real
 
 
-def diffuse(field, amount, substeps=1):
+def diffuse(field, diffusivity, dt, substeps=1):
     u"""
 Simulate a finite-time diffusion process of the form dF/dt = α · ΔF on a given `Field` F with diffusion coefficient α.
 
@@ -24,22 +24,22 @@ Otherwise, finite differencing is used to approximate the
     """
     if isinstance(field, ConstantField):
         return field
-    if isinstance(field, StaggeredGrid):
-        return struct.map(lambda grid: diffuse(grid, amount, substeps=substeps), field, leaf_condition=lambda x: isinstance(x, CenteredGrid))
-    assert isinstance(field, CenteredGrid), "Cannot diffuse field of type '%s'" % type(field)
+    assert isinstance(field, Grid), "Cannot diffuse field of type '%s'" % type(field)
+    amount = diffusivity * dt
     if field.extrapolation == 'periodic' and not isinstance(amount, Field):
-        fft_laplace = -(2 * pi) ** 2 * field.squared_frequencies
+        fft_laplace = -(2 * pi) ** 2 * squared(fftfreq(field))
         diffuse_kernel = math.exp(fft_laplace * amount)
-        return math.real(math.ifft(field.fft() * math.to_complex(diffuse_kernel)))
+        return real(ifft(fft(field) * diffuse_kernel))
     else:
-        data = field.data
         if isinstance(amount, Field):
-            amount = amount.at(field).data
-        else:
-            amount = math.batch_align(amount, 0, data)
+            amount = amount.at(field)
         for i in range(substeps):
-            data += amount / substeps * field.laplace().data
-    return field.with_data(data)
+            field += amount / substeps * laplace(field)
+        return field
+
+
+# def resample(field: Field, other: Field):
+#     other.elements
 
 
 def data_bounds(field):

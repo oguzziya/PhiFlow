@@ -117,15 +117,7 @@ def detect_slices(app):
 
 def _batch_size_of_field(field):
     if isinstance(field, Field):
-        if field._batch_size is not None:
-            return field._batch_size
-        elif isinstance(field, CenteredGrid) and field.data.shape[0] != 1:
-            return field.data.shape[0]
-        elif isinstance(field, StaggeredGrid):
-            children_batch_sizes = [_batch_size_of_field(f) for f in field.unstack()]
-            for bs in children_batch_sizes:
-                if bs is not None:
-                    return bs
+        return field.shape.batch.sizes[0] if len(field.shape.batch) > 0 else None
     if isinstance(field, numpy.ndarray):
         if field.ndim > 1 and field.shape[0] != 1:
             return field.shape[0]

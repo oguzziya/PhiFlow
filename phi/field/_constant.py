@@ -16,10 +16,6 @@ class ConstantField(Field):
         return _expand_axes(self.data, points)
 
     @property
-    def rank(self):
-        return None
-
-    @property
     def component_count(self):
         return self.data.shape[-1]
 

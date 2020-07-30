@@ -1,8 +1,8 @@
 from numbers import Number
 
 from phi import math
-from phi.math.blas import conjugate_gradient
-from phi.math.helper import _dim_shifted
+from phi.math import optim
+from phi.math._helper import _dim_shifted
 from phi.field import CenteredGrid
 from .solver_api import PoissonDomain, PoissonSolver
 from phi.physics.material import Material
@@ -36,7 +36,7 @@ Obstacles are allowed to vary between examples but the same number of iterations
             pressure_padded = pressure.padded([[1, 1]] * pressure.rank)
             return _weighted_sliced_laplace_nd(pressure_padded.data, weights=fluid_mask)
 
-        return conjugate_gradient(divergence, apply_A, guess, self.accuracy, self.max_iterations, back_prop=enable_backprop)
+        return optim.conjugate_gradient(divergence, apply_A, guess, self.accuracy, self.max_iterations, back_prop=enable_backprop)
 
 
 def _weighted_sliced_laplace_nd(tensor, weights):

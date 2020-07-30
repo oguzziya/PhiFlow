@@ -61,7 +61,3 @@ class AngularVelocity(AnalyticField):
     def falloff(self, falloff):
         assert callable(falloff) or falloff is None
         return falloff
-
-    @property
-    def rank(self):
-        return math.staticshape(self.location)[-1]

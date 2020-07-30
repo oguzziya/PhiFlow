@@ -1,151 +1,155 @@
-from phi import math
-from phi.math import Shape
+from __future__ import annotations
+
 from phi.geom import Geometry
+from phi.math import Shape
 
 
 class Field:
 
     @property
-    def elements(self):
+    def elements(self) -> Geometry:
         """
-        Returns the geometry of all cells/particles/elements at which this Field is sampled.
-        If the components of this field are sampled at different locations, this method raises StaggeredSamplePoints.
-        If this field has no sample points, this method returns None.
-        :rtype: Geometry
-        :return: all sample elements
+        Returns a geometrical representation of the discretized volume elements.
+        The result is a tuple of Geometry objects, each of which can have additional spatial (but not batch) dimensions.
+
+        For grids, the geometries are boxes while particle fields may be represented as spheres.
+
+        If this Field has no discrete points, this method returns an empty geometry.
+
+        :return: Geometry with all batch/spatial dimensions of this Field. Staggered sample points are modelled using extra batch dimensions.
         """
         raise NotImplementedError(self)
 
     @property
-    def shape(self):
+    def points(self):
+        return self.elements.center
+
+    @property
+    def shape(self) -> Shape:
         """
         Returns a shape with the following properties
-        * The spatial dimensions match the dimensions of this Field
+
+        * The spatial dimension names match the dimensions of this Field
         * The batch dimensions match the batch dimensions of this Field
         * The channel dimensions match the channels of this Field
-        :rtype: Shape
         """
         raise NotImplementedError()
 
-    def sample_at(self, points):
-        """
-        Samples this field at the given points.
-        :param points: tensor or rank >= 2 containing world-space vectors
-        :return: tensor of shape (*location.shape[:-1], field.component_count)
-        """
-        raise NotImplementedError(self)
-
-    def approximate_mean_value_in(self, geometry):
-        """
-        Computes the (approximate) mean field value inside the region specified by `geometry`.
-        The geometry is assumed to be small compared to the structure of this field and may be approximated as a simpler shape.
-
-        Let V be the volume of `geometry`. This method approximates `1/V * integral_V field.sample_at(x) dx`.
-        :param geometry: (batched) Geometry
-        :type geometry: Geometry
-        :return: float tensor of shape (*geometry.batch_dimensions, field.component_count)
-        """
-        assert isinstance(geometry, Geometry)
-        return self.sample_at(geometry.center)
-
-    def at(self, other_field):
-        """
-        Resample this field at the same points as other_field.
-        The returned Field is compatible with other_field.
-        :param other_field: Field
-        :return: a new Field which samples all components of this field at the points of other_field
-        """
-        try:
-            values = self.approximate_mean_value_in(other_field.elements)
-            result = other_field.copied_with(data=values)
-            return result
-        except StaggeredSamplePoints:  # other_field is staggered
-            return broadcast_at(self, other_field)
-
     @property
-    def rank(self):
+    def rank(self) -> int:
         """
         Spatial rank of the field (1 for 1D, 2 for 2D, 3 for 3D).
         This is equal to the spatial rank of the `data`.
-        :return: int
         """
         return self.shape.spatial.rank
 
-    def unstack(self, dimension=0):
+    def sample_at(self, points, reduce_channels=()):
         """
-        Split the Field by components.
-        If the field only has one component, returns a list containing itself.
+        Sample this field at the world-space locations (in physical units) given by points.
+
+        Points must be one of the following:
+
+        * **Tensor** with exactly one channel dimension.
+          The channel dimension holds the vectors that reference the locations in world-space.
+          Batch dimensions are matched with the batch dimensions of this Field.
+          Spatial dimensions can be used to sample a grid of locations.
+
+        * **Geometry**. Approximates the mean field value inside the volume.
+          For small volumes, the value at the volume's center may be sampled.
+          The batch dimensions of the geometry are matched with this Field.
+          Spatial dimensions can be used to sample a grid of geometries.
+
+        * **List** or **tuple** of any of these. This broadcasts the sampling for all entries in the list.
+          The result will have the same (nested) structure.
+
+        :param points: world-space locations
+        :param reduce_channels: batch dimensions to be reduced against channel dimensions. Indicates that the different channels of this field should be sampled at different locations.
+        :return: object of same kind as points
+        """
+        # * **Field**. The values of that field are interpreted as the sample locations. Analytic fields cannot be used.
+        raise NotImplementedError(self)
+
+    def _resample_to(self, representation: Field) -> Field:
+        return NotImplemented
+
+    def _resample_from(self, data: Field) -> Field:
+        return NotImplemented
+
+    # def resample(self, other: Field) -> Field:
+    #     """
+    #     Changes the underlying data structure of this Field to one that matches the other.
+    #     This typically involves interpolation.
+    #
+    #     Note that the values of other are ignored by this method, only its sample points are of concern.
+    #
+    #     This method differs from sample_at(other.elements) in that not all components may be sampled at all points.
+    #
+    #     :param other: Field with discrete data structure (other.elements must not be None)
+    #     :return: Field of same type as other
+    #     """
+    #     raise NotImplementedError(self)
+
+    def unstack(self, dimension=0) -> tuple:
+        """
+        Unstack the field along one of its dimensions.
+        The dimension can be batch, spatial or channel.
+
+        :param dimension: name of the dimension to unstack, must be part of `self.shape`
         :return: tuple of Fields
-        :rtype: tuple
         """
         raise NotImplementedError()
 
-    @property
-    def has_points(self):
-        try:
-            return self.points is not None
-        except StaggeredSamplePoints:
-            return True
-
     def __mul__(self, other):
-        return self.__dataop__(other, True, lambda d1, d2: math.mul(d1, d2))
+        return self._op2(other, lambda d1, d2: d1 * d2)
 
     __rmul__ = __mul__
 
     def __truediv__(self, other):
-        return self.__dataop__(other, True, lambda d1, d2: math.div(d1, d2))
+        return self._op2(other, lambda d1, d2: d1 / d2)
 
     def __rtruediv__(self, other):
-        return self.__dataop__(other, False, lambda d1, d2: math.div(d2, d1))
+        return self._op2(other, lambda d1, d2: d2 / d1)
 
     def __sub__(self, other):
-        return self.__dataop__(other, False, lambda d1, d2: math.sub(d1, d2))
+        return self._op2(other, lambda d1, d2: d1 - d2)
 
     def __rsub__(self, other):
-        return self.__dataop__(other, False, lambda d1, d2: math.sub(d2, d1))
+        return self._op2(other, lambda d1, d2: d2 - d1)
 
     def __add__(self, other):
-        return self.__dataop__(other, False, lambda d1, d2: math.add(d1, d2))
+        return self._op2(other, lambda d1, d2: d1 + d2)
 
     __radd__ = __add__
 
     def __pow__(self, power, modulo=None):
-        return self.__dataop__(power, False, lambda f, p: math.pow(f, p))
+        return self._op2(power, lambda f, p: f ** p)
 
     def __neg__(self):
-        return self * -1
+        return self._op1(lambda x: -x)
 
     def __gt__(self, other):
-        return self.__dataop__(other, False, lambda x, y: x > y)
+        return self._op2(other, lambda x, y: x > y)
 
     def __ge__(self, other):
-        return self.__dataop__(other, False, lambda x, y: x >= y)
+        return self._op2(other, lambda x, y: x >= y)
 
     def __lt__(self, other):
-        return self.__dataop__(other, False, lambda x, y: x < y)
+        return self._op2(other, lambda x, y: x < y)
 
     def __le__(self, other):
-        return self.__dataop__(other, False, lambda x, y: x <= y)
+        return self._op2(other, lambda x, y: x <= y)
 
-    def __dataop__(self, other, linear_if_scalar, data_operator):
-        if isinstance(other, Field):
-            assert self.compatible(other), 'Fields are not compatible: %s and %s' % (self, other)
-            self_data = self.data if self.has_points else self.at(other).data
-            other_data = other.data if other.has_points else other.at(self).data
-            data = data_operator(self_data, other_data)
-        else:
-            data = data_operator(self.data, other)
-        return self.copied_with(data=data)
+    def _op1(self, operator):
+        """
+        Perform an operation on the data of this field.
 
-    def default_physics(self):
-        from phi.physics.effect import FieldPhysics
-        return FieldPhysics(self.name)
+        :param operator: function that accepts tensors and extrapolations and returns objects of the same type and dimensions
+        :return: Field of same type
+        """
+        raise NotImplementedError()
 
-
-class StaggeredSamplePoints(Exception):
-
-    def __init__(self, *args):
-        Exception.__init__(self, *args)
+    def _op2(self, other, operator):
+        raise NotImplementedError()
 
 
 class IncompatibleFieldTypes(Exception):
@@ -153,11 +157,13 @@ class IncompatibleFieldTypes(Exception):
         Exception.__init__(self, *args)
 
 
-def broadcast_at(field1, field2):
-    if field1.component_count != field2.component_count and field1.component_count != 1:
-        raise IncompatibleFieldTypes('Can only resample to staggered fields with same number of components.\n%s\n%s' % (field1, field2))
-    if field1.component_count == 1:
-        new_components = [field1.at(f2) for f2 in field2.unstack()]
-    else:
-        new_components = [f1.at(f2) for f1, f2 in zip(field1.unstack(), field2.unstack())]
-    return field2.copied_with(data=tuple(new_components))
+def resample(data: Field, representation: Field):
+    result = data._resample_to(representation)
+    if result != NotImplemented:
+        return result
+    result = representation._resample_from(data)
+    if result != NotImplemented:
+        return result
+    elements = representation.elements
+    resampled = data.sample_at(elements, reduce_channels=elements.shape.non_channel.without(representation.shape).names)
+    return representation.with_data(resampled)

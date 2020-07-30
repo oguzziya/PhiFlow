@@ -126,10 +126,6 @@ class SampledField(Field):
     sample_points.override(struct.staticshape, lambda self, data: (self._batch_size, self._point_count, self.rank))
 
     @property
-    def rank(self):
-        return math.staticshape(self.sample_points)[-1]
-
-    @property
     def component_count(self):
         if math.ndims(self.data) == 0:
             return 1

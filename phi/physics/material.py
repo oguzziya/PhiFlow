@@ -1,3 +1,5 @@
+from phi.math import extrapolation
+
 """
 Surface material definitions including constants.
 """
@@ -76,30 +78,30 @@ For vector fields that respect boundaries (e.g. velocity), use vector_extrapolat
     :rtype: str
         """
         if self.periodic:
-            return 'periodic'
+            return extrapolation.PERIODIC
         if self.solid:
-            return 'boundary'
+            return extrapolation.BOUNDARY
         else:
-            return 'constant'
+            return extrapolation.ZERO
 
     @struct.derived()
     def accessible_extrapolation_mode(self):
         if self.periodic:
-            return 'periodic'
+            return extrapolation.PERIODIC
         if self.solid:
-            return 'constant'
+            return extrapolation.ZERO
         else:
-            return 'boundary'
+            return extrapolation.BOUNDARY
 
     @struct.derived()
     def vector_extrapolation_mode(self):
         if self.periodic:
-            return 'periodic'
+            return extrapolation.PERIODIC
         if self.solid:
             assert self.friction in (0, 1)
-            return 'boundary' if self.friction == 0 else 'constant'
+            return extrapolation.BOUNDARY if self.friction == 0 else extrapolation.ZERO
         else:
-            return 'constant'
+            return extrapolation.ZERO
 
 
 OPEN = Material('open', solid=False)

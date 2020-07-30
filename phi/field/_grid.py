@@ -1,32 +1,50 @@
+from abc import ABC
+
 import numpy as np
 import six
 
 from phi import math
-from phi.backend.backend_helper import general_grid_sample_nd
-from phi.geom import AABox, box
-from phi.geom.geometry import assert_same_rank
-from phi.physics.domain import Domain
-from phi.physics.material import Material
+from phi.geom import AABox, GridCell, Geometry
+from phi.geom import assert_same_rank
 from phi.struct.functions import mappable
 from phi.struct.tensorop import collapse
-
-from ._field import Field
-from ..math import Shape
-from ..math._shape import CHANNEL_DIM
-from ..math._tensors import tensor, NativeTensor, TensorStack
+from ._field import Field, resample
+from ..backend import Extrapolation, general_grid_sample_nd
+from ..math import Shape, tensor
 
 
-def _crop_for_interpolation(data, offset_float, window_resolution):
-    offset = math.to_int(offset_float)
-    slices = [slice(o, o + res + 1) for o, res in zip(offset, window_resolution)]
-    data = data[tuple([slice(None)] + slices + [slice(None)])]
-    return data
+class Grid(Field, ABC):
+
+    def __init__(self, resolution, box, extrapolation=math.extrapolation.ZERO):
+        assert isinstance(extrapolation, (Extrapolation, tuple, list)), extrapolation
+        self._extrapolation = collapse(extrapolation)
+        self._box = AABox.to_box(box, resolution_hint=resolution)
+
+    @property
+    def box(self):
+        return self._box
+
+    @property
+    def resolution(self):
+        return self.shape.spatial.with_linear_indices()
+
+    @property
+    def dx(self):
+        return self.box.size / self.resolution
+
+    @property
+    def extrapolation(self):
+        return self._extrapolation
+
+    def with_data(self, data):
+        raise NotImplementedError()
 
 
-class CenteredGrid(Field):
+class CenteredGrid(Grid):
 
-    def __init__(self, data, box=None, extrapolation='boundary', extrapolation_value=0):
-        """Create new CenteredGrid from array like data
+    def __init__(self, data, box=None, extrapolation=math.extrapolation.ZERO):
+        """
+        Create CenteredGrid given its data and dimensions.
 
         :param data: numerical values to be set as values of CenteredGrid (immutable)
         :type data: array-like
@@ -35,69 +53,81 @@ class CenteredGrid(Field):
         :param extrapolation: set conditions for boundaries, defaults to 'boundary'
         :type extrapolation: str, optional
         """
-        assert extrapolation in ('periodic', 'constant', 'boundary') or isinstance(extrapolation, (tuple, list)), extrapolation
         self._data = tensor(data)
-        self._extrapolation = collapse(extrapolation)
-        self._extrapolation_value = collapse(extrapolation_value)
-        self._box = AABox.to_box(box, resolution_hint=self.resolution)
+        Grid.__init__(self, self.resolution, box, extrapolation)
+        assert_same_rank(self._data.shape, self._box, 'data dimensions %s do not match box %s' % (self._data.shape, self._box))
+
+    def __repr__(self):
+        return 'Grid[%s, size=%s]' % (self.shape, self.box.size)
 
     @staticmethod
-    def sample(value, domain, batch_size=None, name=None):
-        assert isinstance(domain, Domain)
+    def sample(value, resolution, box, extrapolation=math.extrapolation.ZERO):
         if isinstance(value, Field):
-            assert_same_rank(value.rank, domain.rank, 'rank of value (%s) does not match domain (%s)' % (value.rank, domain.rank))
-            if isinstance(value, CenteredGrid) and value.box == domain.box and np.all(value.resolution == domain.resolution):
+            assert_same_rank(value.rank, box.rank, 'rank of value (%s) does not match domain (%s)' % (value.rank, box.rank))
+            if isinstance(value, CenteredGrid) and value.box == box and np.all(value.resolution == resolution):
                 data = value.data
             else:
-                point_field = CenteredGrid.getpoints(domain.box, domain.resolution)
-                point_field._batch_size = batch_size
-                data = value.at(point_field).data
-        else:  # value is constant
+                point_field = CenteredGrid(math.zeros(resolution), box)
+                data = resample(value, point_field).data
+        else:
             if callable(value):
-                x = CenteredGrid.getpoints(domain.box, domain.resolution).copied_with(extrapolation=Material.extrapolation_mode(domain.boundaries), name=name)
+                x = GridCell(resolution, box).center
                 value = value(x)
-                return value
-            components = math.staticshape(value)[-1] if math.ndims(value) > 0 else 1
-            data = math.add(math.zeros((batch_size,) + tuple(domain.resolution) + (components,)), value)
-        return CenteredGrid(data, box=domain.box, extrapolation=Material.extrapolation_mode(domain.boundaries))
+            value = tensor(value, infer_dimension_types=False)
+            data = math.zeros(resolution) + value
+        return CenteredGrid(data, box, extrapolation)
 
     @property
     def data(self):
         return self._data
 
-    @property
-    def box(self):
-        return self._box
-
-    @property
-    def resolution(self):
-        return self.data.shape.spatial
-
-    @property
-    def dx(self):
-        return self.box.size / self.resolution
+    def with_data(self, data):
+        if isinstance(data, (tuple, list)):
+            assert len(data) == 1
+            data = data[0]
+        return CenteredGrid(data, self._box, self._extrapolation)
 
     @property
     def shape(self):
-        return self.data.shape
+        return self._data.shape
 
     @property
-    def dtype(self):
-        return self.data.dtype
+    def elements(self):
+        return GridCell(self.resolution, self._box)
 
-    @property
-    def extrapolation(self):
-        return self._extrapolation
-
-    @property
-    def extrapolation_value(self):
-        return self._extrapolation_value
-
-    def sample_at(self, points):
+    def sample_at(self, points, reduce_channels=()):
+        if isinstance(points, (tuple, list)) and len(points) == 1:
+            raise NotImplementedError()
+        if isinstance(points, CenteredGrid):
+            points = points.data
+        if isinstance(points, Geometry):
+            points = points.center
         local_points = self.box.global_to_local(points)
-        local_points = math.mul(local_points, math.to_float(self.resolution)) - 0.5
-        resampled = math.resample(self.data, local_points, boundary=_pad_mode(self.extrapolation), interpolation=self.interpolation, constant_values=_pad_value(self.extrapolation_value))
-        return resampled
+        local_points = local_points * self.resolution - 0.5
+        if len(reduce_channels) == 0:
+            return math.resample(self.data, local_points, 'linear', self.extrapolation)
+        else:
+            assert self.shape.channel.sizes == points.shape.get_size(reduce_channels)
+            if len(reduce_channels) > 1:
+                raise NotImplementedError()
+            channels = []
+            for i, channel in enumerate(self._data.unstack()):
+                channels.append(math.resample(channel, local_points[{reduce_channels[0]: i}], 'linear', self.extrapolation))
+            return math.channel_stack(channels)
+
+    def _resample_to(self, representation: Field) -> Field:
+        if self.compatible(representation):
+            return self
+        if isinstance(representation, CenteredGrid) and math.close(self.dx, representation.dx):
+            paddings = _required_paddings_transposed(self.box, self.dx, representation.box)
+            if math.sum(paddings) == 0:
+                origin_in_local = self.box.global_to_local(representation.box.lower) * self.resolution
+                data = math.interpolate_linear(self._data, origin_in_local, representation.resolution.sizes)
+                return CenteredGrid(data, representation.box)
+            elif math.sum(paddings) < 16:
+                padded = self.padded(np.transpose(paddings).tolist())
+                return padded.at(representation)
+        return NotImplemented
 
     def general_sample_at(self, points, reduce):
         local_points = self.box.global_to_local(points)
@@ -105,67 +135,40 @@ class CenteredGrid(Field):
         result = general_grid_sample_nd(self.data, local_points, boundary=_pad_mode(self.extrapolation), constant_values=_pad_value(self.extrapolation_value), math=math.choose_backend([self.data, points]), reduce=reduce)
         return result
 
-    def at(self, other_field):
-        if self.compatible(other_field):
-            return self
-        if isinstance(other_field, CenteredGrid) and np.allclose(self.dx, other_field.dx):
-            paddings = _required_paddings_transposed(self.box, self.dx, other_field.box)
-            if math.sum(paddings) == 0:
-                origin_in_local = self.box.global_to_local(other_field.box.lower) * self.resolution
-                data = _crop_for_interpolation(self.data, origin_in_local, other_field.resolution)
-                dimensions = self.resolution != other_field.resolution
-                dimensions = [d for d in math.spatial_dimensions(data) if dimensions[d - 1]]
-                data = math.interpolate_linear(data, origin_in_local % 1.0, dimensions)
-                return CenteredGrid(data, other_field.box)
-            elif math.sum(paddings) < 16:
-                padded = self.padded(np.transpose(paddings).tolist())
-                return padded.at(other_field)
-        return Field.at(self, other_field)
+    def compatible(self, other):
+        return isinstance(other, CenteredGrid) and other.box == self.box and other.resolution == self.resolution
 
     def unstack(self, dimension=0):
         components = self.data.unstack(dimension=dimension)
         return [CenteredGrid(component, box=self.box) for i, component in enumerate(components)]
 
-    @property
-    def elements(self):
-        idx_zyx = np.meshgrid(*[np.linspace(0.5 / dim, 1 - 0.5 / dim, dim) for dim in self.resolution.sizes], indexing="ij")
-        idx = [NativeTensor(t, self.resolution) for t in idx_zyx]
-        local_coords = TensorStack(idx, 0, CHANNEL_DIM)
-        points = self.box.local_to_global(local_coords)
-        return box(center=points, size=self.dx)
+    def __getitem__(self, item):
+        return CenteredGrid(self._data[item], self._box, self._extrapolation)
 
-    def __repr__(self):
-        return 'Grid[%s(%d), size=%s, %s]' % ('x'.join([str(r) for r in self.resolution]), self.component_count, self.box.size, self.dtype.data)
+    def _op1(self, operator):
+        data = operator(self._data)
+        extrapolation_ = operator(self._extrapolation)
+        return CenteredGrid(data, self._box, extrapolation_)
 
-    # def padded(self, widths):
-    #     if isinstance(widths, int):
-    #         widths = [[widths, widths]] * self.rank
-    #     data = math.pad(self.data, [[0, 0]] + widths + [[0, 0]], _pad_mode(self.extrapolation), constant_values=_pad_value(self.extrapolation_value))
-    #     w_lower, w_upper = np.transpose(widths)
-    #     box = AABox(self.box.lower - w_lower * self.dx, self.box.upper + w_upper * self.dx)
-    #     return self.copied_with(data=data, box=box)
-    #
-    # def axis_padded(self, axis, lower, upper):
-    #     widths = [[lower, upper] if ax == axis else [0,0] for ax in range(self.rank)]
-    #     return self.padded(widths)
+    def _op2(self, other, operator):
+        if self.compatible(other):
+            data = operator(self._data, other.data)
+            extrapolation = operator(self.extrapolation, other.extrapolation)
+            return CenteredGrid(data, self.box, extrapolation)
+        else:
+            data = operator(self.data, other)
+            return CenteredGrid(data, self.box, self.extrapolation)
+        # if isinstance(other, CenteredGrid):
+        #     assert self.compatible(other), 'Fields are not compatible: %s and %s' % (self, other)
+        #     self_data = self.data if self.has_points else self.at(other).data
+        #     other_data = other.data if other.has_points else other.at(self).data
+        #     data = data_operator(self_data, other_data)
+        # else:
+        #     data = data_operator(self.data, other)
+        # return self.copied_with(data=data)
 
-    # def laplace(self, physical_units=True, axes=None):
-    #     if not physical_units:
-    #         data = math.laplace(self.data, padding=_pad_mode(self.extrapolation), axes=axes)
-    #     else:
-    #         if not self.has_cubic_cells:
-    #             raise NotImplementedError('Only cubic cells supported.')
-    #         laplace = math.laplace(self.data, padding=_pad_mode(self.extrapolation), axes=axes)
-    #         data = laplace / self.dx[0] ** 2
-    #     extrapolation = map_for_axes(_gradient_extrapolation, self.extrapolation, axes, self.rank)
-    #     return self.copied_with(data=data, extrapolation=extrapolation, flags=())
-    #
-    # def gradient(self, physical_units=True, difference='central'):
-    #     if not physical_units or self.has_cubic_cells:
-    #         data = math.gradient(self.data, dx=np.mean(self.dx), difference=difference, padding=_pad_mode(self.extrapolation))
-    #         return self.copied_with(data=data, extrapolation=_gradient_extrapolation(self.extrapolation), flags=())
-    #     else:
-    #         raise NotImplementedError('Only cubic cells supported.')
+    def __neg__(self):
+        return CenteredGrid(-self.data, self.box, self.extrapolation)
 
 
 def _required_paddings_transposed(box, dx, target, threshold=1e-5):
@@ -202,12 +205,13 @@ Converts an extrapolation string (or struct of strings) to a string that can be 
 
 
 @mappable()
-def _gradient_extrapolation(extrapolation):
+def _gradient_extrapolation(field_extrapolation):
     """
 Given the extrapolation of a field, returns the extrapolation mode of the corresponding gradient field.
     :param extrapolation: string or struct of strings
     :return: same type as extrapolation
     """
-    return {'periodic': 'periodic',
-            'boundary': 'constant',
-            'constant': 'constant'}[extrapolation]
+    return field_extrapolation.gradient()
+
+
+

@@ -11,14 +11,20 @@ from phi.math._tensors import AbstractTensor
 
 class TestFields(TestCase):
 
-    def test_properties(self):
-        # physics_config.x_last()
+    def test_centered_grid_properties(self):
+        physics_config.x_last()
         f = CenteredGrid(math.zeros([1, 3, 4, 1]), box[0:30, 0:40])
+        print(repr(f))
         self.assertIsInstance(f.box.lower, AbstractTensor)
         f.dx.assert_close(10)
-        centers = f.elements.center
         self.assertEqual('(y=3, x=4, 2)', repr(f.elements.center.shape))
-        print()
+
+    def test_staggered_grid_properties(self):
+        physics_config.x_first()
+        f = StaggeredGrid.from_staggered_tensor(math.zeros([1, 4, 5, 2]), box[0:30, 0:40])
+        x, y = f.x, f.y
+        self.assertIsInstance(x, CenteredGrid)
+        x.dx.assert_close(y.dx, 10)
 
 
     def test_compatibility(self):

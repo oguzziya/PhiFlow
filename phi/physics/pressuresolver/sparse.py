@@ -4,8 +4,8 @@ import scipy.sparse
 import scipy.sparse.linalg
 
 from phi import math
-from phi.math.blas import conjugate_gradient
-from phi.math.helper import _dim_shifted
+from phi.math import optim
+from phi.math._helper import _dim_shifted
 from phi.physics.material import Material
 from phi.struct.tensorop import collapsed_gather_nd
 from .solver_api import PoissonSolver, FluidDomain
@@ -80,7 +80,7 @@ class SparseCG(PoissonSolver):
         if guess is not None:
             guess = math.reshape(guess, [-1, int(np.prod(field.shape[1:]))])
         apply_A = lambda pressure: math.matmul(A, pressure)
-        result_vec, iterations = conjugate_gradient(div_vec, apply_A, guess, self.accuracy, self.max_iterations, enable_backprop)
+        result_vec, iterations = optim.conjugate_gradient(div_vec, apply_A, guess, self.accuracy, self.max_iterations, enable_backprop)
         return math.reshape(result_vec, math.shape(field)), iterations
 
 

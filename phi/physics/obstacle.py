@@ -1,5 +1,5 @@
 from phi import struct
-from phi.geom.geometry import Geometry
+from phi.geom import Geometry
 
 from phi.field import GeometryMask
 from .effect import FieldEffect

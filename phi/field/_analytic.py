@@ -1,80 +1,29 @@
-from phi.backend.backend import Backend
+from abc import ABC
+
+from phi.backend import Backend
 from phi import math, struct
-from phi.geom.geometry import assert_same_rank
+from phi.geom import assert_same_rank
 
 from ._field import Field
 
 
-class AnalyticField(Field):
-
-    def __init__(self, rank, data=None, name=None, **kwargs):
-        Field.__init__(self, **struct.kwargs(locals(), ignore='rank'))
-        self._rank = rank
+class AnalyticField(Field, ABC):
 
     @property
-    def rank(self):
-        return self._rank
-
-    @property
-    def component_count(self):
-        if self._rank is None:
-            return None
-        try:
-            example_value = self.sample_at([[0] * self._rank])
-            return math.staticshape(example_value)[-1]
-        except NotImplementedError:
-            return None
-
-    def unstack(self):
-        assert self.component_count is not None, 'The component_count of %s is unknown' % self
-        if self.component_count == 1:
-            return [self]
-        else:
-            components = []
-            for i in range(self.component_count):
-                def _context(index=i):
-                    return lambda x: x.unstack()[index]
-                components.append(_SymbolicOpField(_context(i), [self]))
-            return components
-
-    @property
-    def points(self):
+    def elements(self):
         return None
 
-    def compatible(self, other_field):
-        return True
+    def unstack(self, dimension=0):
+        components = []
+        size = self.shape.get_size(dimension)
+        for i in range(size):
+            def _context(index=i):
+                return lambda x: x.unstack()[index]
+            components.append(_SymbolicOpField(_context(i), [self]))
+        return components
 
-    def __mul__(self, other):
-        return _SymbolicOpField(lambda x1, x2: x1 * x2, [self, other])
-
-    __rmul__ = __mul__
-
-    def __div__(self, other):
-        return _SymbolicOpField(lambda x1, x2: x1 / x2, [self, other])
-
-    def __truediv__(self, other):
-        return _SymbolicOpField(lambda x1, x2: x1 / x2, [self, other])
-
-    def __sub__(self, other):
-        return _SymbolicOpField(lambda x1, x2: x1 - x2, [self, other])
-
-    def __rsub__(self, other):
-        return _SymbolicOpField(lambda x1, x2: x2 - x1, [self, other])
-
-    def __add__(self, other):
-        return _SymbolicOpField(lambda x1, x2: x1 + x2, [self, other])
-
-    __radd__ = __add__
-
-    def __pow__(self, power, modulo=None):
-        return _SymbolicOpField(lambda x1, x2: x1 ** x2, [self, power])
-
-    def __dataop__(self, other, linear_if_scalar, data_operator):
-        return _SymbolicOpField(data_operator, [self, other])
-
-    @struct.constant(default=None)
-    def data(self, data):
-        return data
+    def _op2(self, other, operator):
+        pass
 
 
 class SymbolicFieldBackend(Backend):

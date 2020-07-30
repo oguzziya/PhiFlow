@@ -8,6 +8,7 @@ from phi.geom import GLOBAL_AXIS_ORDER as physics_config
 from phi.field import CenteredGrid, StaggeredGrid
 from phi.viz.plot import FRONT, RIGHT, TOP
 from .colormaps import COLORMAPS
+from ... import math
 
 EMPTY_FIGURE = {'data': [{'z': None, 'type': 'heatmap'}]}
 
@@ -25,12 +26,12 @@ def dash_graph_plot(data, settings):
         if data.rank == 1:
             return plot(data, settings)
         if data.rank == 2:
-            if component == 'vec2' and data.component_count >= 2:
+            if component == 'vec2' and data.shape.channel.volume >= 2:
                 return vector_field(data, settings)
             else:
                 return heatmap(data, settings)
         if data.rank == 3:
-            if component == 'vec2' and data.component_count >= 2:
+            if component == 'vec2' and data.shape.channel.volum >= 2:
                 return vector_field(slice_2d(data, settings), settings)
             else:
                 return heatmap(slice_2d(data, settings), settings)
@@ -118,32 +119,36 @@ def get_div_map(zmin, zmax, equal_scale=False, colormap=None):
     return cm_str
 
 
-def heatmap(data, settings):
-    assert isinstance(data, (StaggeredGrid, CenteredGrid))
-    assert data.rank == 2
+def heatmap(field, settings):
+    assert isinstance(field, (StaggeredGrid, CenteredGrid))
+    assert field.rank == 2
     batch = settings.get('batch', 0)
     component = settings.get('component', 'x')
 
-    if isinstance(data, StaggeredGrid):
+    if isinstance(field, StaggeredGrid):
         if component == 'x':
-            data = data.unstack()[physics_config.x]
+            field = field.unstack()[physics_config.x]
         elif component == 'y':
-            data = data.unstack()[physics_config.y]
+            field = field.unstack()[physics_config.y]
         elif component == 'z':
             return EMPTY_FIGURE
         elif component == 'length':
-            data = data.at_centers()
+            field = field.at_centers()
         else:
             raise ValueError(component)
-    z = data.data[batch, ...]
+    z = field.data
+    if len(z.shape.batch) > 0:
+        z = z.dimension(z.shape.batch.names[0])[batch]
     z = reduce_component(z, component)
+    z = z.numpy()
+    points = field.points
     if physics_config.is_x_first:
         z = np.transpose(z)
-        x = data.points.data[0, :, 0, 0]
-        y = data.points.data[0, 0, :, 1]
+        x = points[0].y[0].numpy()
+        y = points[1].x[0].numpy()
     else:
-        y = data.points.data[0, :, 0, 0]
-        x = data.points.data[0, 0, :, 1]
+        y = field.points[0, :, 0, 0]
+        x = field.points[0, 0, :, 1]
     if settings.get('slow_colorbar', False):
         z_min, z_max = settings['minmax']
     else:
@@ -198,7 +203,10 @@ def plot(field1d, settings):
 
 
 def reduce_component(tensor, component):
-    clen = tensor.shape[-1]
+    if tensor.shape.channel.rank == 0:
+        return tensor
+    assert tensor.shape.channel.rank == 1
+    clen = tensor.shape.channel.volume
     if clen == 1:
         return tensor[..., 0]
     if component == 'x':
@@ -209,9 +217,9 @@ def reduce_component(tensor, component):
         if clen >= 3:
             return tensor[..., physics_config.z]
         else:
-            return np.zeros_like(tensor[..., 0])
+            return math.zeros_like(tensor[..., 0])
     if component == 'length':
-        return np.sqrt(np.sum(tensor**2, axis=-1, keepdims=False))
+        return math.vec_abs(tensor)
     if component == 'vec2':
         return tensor[..., (physics_config.y, physics_config.x)]
 
@@ -224,17 +232,20 @@ def vector_field(field2d, settings):
     assert field2d.rank == 2
 
     batch = settings.get('batch', 0)
-    batch = min(batch, field2d.data.shape[0])
+    batch = min(batch, field2d.data.shape.batch.volume)
 
     arrow_origin = settings.get('arrow_origin', 'tip')
     assert arrow_origin in ('base', 'center', 'tip')
     max_resolution = settings.get('max_arrow_resolution', 40)
     max_arrows = settings.get('max_arrows', 2000)
-    min_arrow_length = settings.get('min_arrow_length', 0.005) * np.max(field2d.box.size)
+    min_arrow_length = settings.get('min_arrow_length', 0.005) * math.max(field2d.box.size)
     draw_full_arrows = settings.get('draw_full_arrows', False)
 
-    y, x = field2d.points.data[0, ..., (physics_config.y, physics_config.x)]
-    data_y, data_x = field2d.data[batch, ..., (physics_config.y, physics_config.x)]
+    y, x = field2d.points[0][..., (physics_config.y, physics_config.x)]
+    data = field2d.data
+    if len(data.shape.batch) > 0:
+        data = data.dimension(data.shape.batch.names[0])[batch]
+    data_y, data_x = data[..., (physics_config.y, physics_config.x)]
 
     while np.prod(x.shape) > max_resolution ** 2:
         y = y[::2, ::2]
@@ -242,10 +253,10 @@ def vector_field(field2d, settings):
         data_y = data_y[::2, ::2]
         data_x = data_x[::2, ::2]
 
-    y = y.flatten()
-    x = x.flatten()
-    data_y = data_y.flatten()
-    data_x = data_x.flatten()
+    y = y.numpy().flatten()
+    x = x.numpy().flatten()
+    data_y = data_y.numpy().flatten()
+    data_x = data_x.numpy().flatten()
 
     if max_arrows is not None or min_arrow_length > 0:
         length = np.sqrt(data_y**2 + data_x**2)
@@ -268,7 +279,8 @@ def vector_field(field2d, settings):
         x -= 0.5 * data_x
         y -= 0.5 * data_y
 
-    x_range, y_range = [field2d.box.get_lower(1), field2d.box.get_upper(1)], [field2d.box.get_lower(0), field2d.box.get_upper(0)]
+    x_range = [field2d.box.get_lower(1).numpy(), field2d.box.get_upper(1).numpy()]
+    y_range = [field2d.box.get_lower(0).numpy(), field2d.box.get_upper(0).numpy()]
     if physics_config.is_x_first:
         x_range, y_range = y_range, x_range
 
