@@ -25,10 +25,8 @@ class Sphere(Geometry):
         return self._center
 
     def lies_inside(self, location):
-        center = math.batch_align(self.center, 1, location)
-        radius = math.batch_align(self.radius, 0, location)
-        distance_squared = math.sum((location - center) ** 2, axis=-1, keepdims=True)
-        return distance_squared <= radius ** 2
+        distance_squared = math.sum((location - self.center) ** 2, axis=0)
+        return distance_squared <= self.radius ** 2
 
     def approximate_signed_distance(self, location):
         """
@@ -37,12 +35,10 @@ Very close to the sphere center, the distance takes a constant value.
         :param location: float tensor of shape (batch_size, ..., rank)
         :return: float tensor of shape (*location.shape[:-1], 1).
         """
-        center = math.batch_align(self.center, 1, location)
-        radius = math.batch_align(self.radius, 0, location)
-        distance_squared = math.sum((location - center)**2, axis=-1, keepdims=True)
-        distance_squared = math.maximum(distance_squared, radius * 1e-2)  # Prevent infinite gradient at sphere center
+        distance_squared = math.vec_abs(location - self.center)
+        distance_squared = math.maximum(distance_squared, self.radius * 1e-2)  # Prevent infinite gradient at sphere center
         distance = math.sqrt(distance_squared)
-        return distance - radius
+        return distance - self.radius
 
     def bounding_radius(self):
         return self.radius

@@ -39,23 +39,20 @@ class AbstractBox(Geometry):
         raise NotImplementedError(self)
 
     def bounding_radius(self):
-        return math.max(self.size, axis=-1, keepdims=True) * 1.414214
+        return math.max(self.size, axis=0) * 1.414214
 
     def bounding_half_extent(self):
         return self.size * 0.5
 
     def global_to_local(self, global_position):
-        size, lower = math.batch_align([self.size, self.lower], 1, global_position)
-        return (global_position - lower) / size
+        return (global_position - self.lower) / self.size
 
     def local_to_global(self, local_position):
-        size, lower = math.batch_align([self.size, self.lower], 1, local_position)
-        return local_position * size + lower
+        return local_position * self.size + self.lower
 
     def lies_inside(self, location):
-        lower, upper = math.batch_align([self.lower, self.upper], 1, location)
-        bool_inside = (location >= lower) & (location <= upper)
-        return math.all(bool_inside, axis=-1, keepdims=True)
+        bool_inside = (location >= self.lower) & (location <= self.upper)
+        return math.all(bool_inside, axis=0)
 
     def approximate_signed_distance(self, location):
         """
@@ -65,11 +62,10 @@ For inside locations it is `-max(abs(l - s))`.
         :param location: float tensor of shape (batch_size, ..., rank)
         :return: float tensor of shape (*location.shape[:-1], 1).
         """
-        lower, upper = math.batch_align([self.lower, self.upper], 1, location)
-        center = 0.5 * (lower + upper)
-        extent = upper - lower
+        center = 0.5 * (self.lower + self.upper)
+        extent = self.upper - self.lower
         distance = math.abs(location - center) - extent * 0.5
-        return math.max(distance, axis=-1, keepdims=True)
+        return math.max(distance, axis=0)
 
     def get_lower(self, axis):
         return self._get(self.lower, axis)
@@ -242,9 +238,25 @@ def bounding_box(geometry):
     return AABox(lower=center - extent, upper=center + extent)
 
 
-def grid_cells(resolution, box):
-    idx_zyx = np.meshgrid(*[np.linspace(0.5 / dim, 1 - 0.5 / dim, dim) for dim in resolution.sizes], indexing="ij")
-    idx = [NativeTensor(t, resolution) for t in idx_zyx]
-    local_coords = TensorStack(idx, 0, CHANNEL_DIM)
-    points = box.local_to_global(local_coords)
-    return Cuboid(points, half_size=box.size / resolution.sizes / 2)
+class GridCell(Cuboid):
+
+    def __init__(self, resolution, bounds: AbstractBox):
+        idx_zyx = np.meshgrid(*[np.linspace(0.5 / dim, 1 - 0.5 / dim, dim) for dim in resolution.sizes], indexing="ij")
+        idx = [NativeTensor(t, resolution) for t in idx_zyx]
+        local_coords = TensorStack(idx, 0, CHANNEL_DIM)
+        points = bounds.local_to_global(local_coords)
+        Cuboid.__init__(self, points, half_size=bounds.size / resolution.sizes / 2)
+        self._resolution = resolution
+        self._bounds = bounds
+
+    @property
+    def resolution(self):
+        return self._resolution
+
+    @property
+    def bounds(self):
+        return self._bounds
+
+    @property
+    def grid_size(self):
+        return self._bounds.size

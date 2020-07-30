@@ -2,7 +2,7 @@ from unittest import TestCase
 
 import numpy as np
 
-from phi.geom import AABox, Sphere, box
+from phi.geom import AABox, Sphere, box, GLOBAL_AXIS_ORDER
 from phi.field import CenteredGrid
 
 
@@ -11,6 +11,11 @@ def points():
 
 
 class TestGeometry(TestCase):
+
+    def test_simple_box(self):
+        GLOBAL_AXIS_ORDER.x_first()
+        b = AABox(0, [1, 2])
+        self.assertEqual('(x=1, y=1, 2)', repr(b.shape))
 
     def test_batched_box(self):
         mybox = AABox(0, np.stack([np.ones(10), np.linspace(0, 10, 10)], axis=-1))

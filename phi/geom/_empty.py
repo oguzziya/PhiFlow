@@ -1,14 +1,14 @@
 import numpy as np
 
 from ._geom import Geometry
-from ..math import Shape
+from ..math._shape import EMPTY_SHAPE
 
 
 class _NoGeometry(Geometry):
 
     @property
     def shape(self):
-        return Shape((), (), ())
+        return EMPTY_SHAPE
 
     @property
     def center(self):
