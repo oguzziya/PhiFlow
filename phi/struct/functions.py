@@ -2,7 +2,7 @@ import warnings
 
 import six
 
-from ..backend.dynamic_backend import DYNAMIC_BACKEND as math, NoBackendFound
+from ..backend import math, NoBackendFound
 from .context import _unsafe, skip_validate
 from .item_condition import ALL_ITEMS, context_item_condition
 from .structdef import Item

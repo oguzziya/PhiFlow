@@ -1,5 +1,5 @@
-from phi.backend.backend import Backend
-from . import context, struct, functions
+from phi.backend import Backend
+from . import struct, functions
 
 
 class StructBroadcastBackend(Backend):

@@ -5,7 +5,7 @@ from copy import copy
 import numpy as np
 import six
 
-from ..backend.dynamic_backend import DYNAMIC_BACKEND as math, NoBackendFound
+from ..backend import math, NoBackendFound
 from .context import skip_validate
 from .item_condition import context_item_condition, VARIABLES, CONSTANTS
 from .structdef import Item, derived, _IndexItem
