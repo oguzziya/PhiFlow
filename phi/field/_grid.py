@@ -98,7 +98,7 @@ class CenteredGrid(Grid):
             return self._data
         elif isinstance(points, GridCell) and math.close(self.dx, points.size):
             fast_resampled = self._shift_resample(points.resolution, points.bounds)
-            if fast_resampled != NotImplemented:
+            if fast_resampled is not NotImplemented:
                 return fast_resampled
         elif isinstance(points, Geometry):
             points = points.center
@@ -120,7 +120,7 @@ class CenteredGrid(Grid):
         if math.sum(paddings) == 0:
             origin_in_local = self.box.global_to_local(box.lower) * self.resolution
             data = math.interpolate_linear(self._data, origin_in_local, resolution.sizes)
-            return CenteredGrid(data, box)
+            return data
         elif math.sum(paddings) < 16:
             padded = self.padded(np.transpose(paddings).tolist())
             return padded.at(representation)

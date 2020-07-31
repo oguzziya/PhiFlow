@@ -14,7 +14,7 @@ CHANNEL_DIM = 2
 
 class Shape:
 
-    def __init__(self, sizes, names, types, indices=None):
+    def __init__(self, sizes, names, types, indices=None, check_singleton=True):
         """
 
         :param sizes: list of dimension sizes
@@ -27,8 +27,8 @@ class Shape:
         self._types = np.array(types, dtype=np.int8)
         indices = indices if indices is not None else range(len(sizes))
         self._indices = np.array(indices, dtype=np.int8)
-        for i, size in enumerate(sizes):
-            if isinstance(size, int) and size == 1:
+        for i, (size, dim_type) in enumerate(zip(self._sizes, self._types)):
+            if isinstance(size, int) and size == 1 and dim_type != SPATIAL_DIM and check_singleton:
                 warnings.warn("Dimension '%s' at index %d of shape %s has size 1. Is this intentional? Singleton dimensions are not supported." % (names[i], i, sizes))
 
     @property
@@ -236,7 +236,7 @@ class Shape:
     def __and__(self, other):
         return self.combined(other)
 
-    def plus(self, size, name, dim_type, pos=None):
+    def plus(self, size, name, dim_type, pos=None, check_singleton=True):
         """
         Add a dimension to the shape.
 
@@ -262,7 +262,7 @@ class Shape:
         sizes.insert(pos, size)
         names.insert(pos, name)
         types.insert(pos, dim_type)
-        return Shape(sizes, names, types)
+        return Shape(sizes, names, types, check_singleton=check_singleton)
 
     def without(self, other):
         if isinstance(other, (str, int)):

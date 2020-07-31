@@ -143,7 +143,6 @@ class AbstractTensor:
         return [_TensorDim(self, name) for name in self.shape.names]
 
     def __getattr__(self, name):
-        print(name)
         if name in self.shape:
             return _TensorDim(self, name)
         raise AttributeError("%s has no attribute '%s'" % (self, name))
@@ -359,7 +358,7 @@ class NativeTensor(AbstractTensor):
         for name in order:
             if name not in self.shape:
                 tensor = native_math.expand_dims(tensor, axis=-1)
-                shape = shape.plus(1, name, CHANNEL_DIM, pos=-1)
+                shape = shape.plus(1, name, CHANNEL_DIM, pos=-1, check_singleton=False)
         # --- Transpose ---
         perm = shape.perm(order)
         tensor = native_math.transpose(tensor, perm)
