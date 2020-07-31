@@ -46,7 +46,7 @@ from ._tensor_math import (
     cast,
     sin, cos,
     dtype,
-    tile,
+    tile, expand_tile,
     sparse_tensor,
     close, assert_close,
 )

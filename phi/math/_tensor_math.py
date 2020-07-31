@@ -363,6 +363,11 @@ def tile(value, multiples):
     raise NotImplementedError()
 
 
+def expand_channel(x, dim_size, dim_name):
+    x = tensor(x)
+
+
+
 def sparse_tensor(indices, values, shape):
     raise NotImplementedError()
 

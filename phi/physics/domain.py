@@ -89,7 +89,7 @@ class Domain:
         assert isinstance(domain2, Domain), 'Not a Domain: %s' % type(domain2)
         return np.all(domain1.resolution == domain2.resolution) and domain1.box == domain2.box
 
-    def grid(self, value, type:type = CenteredGrid):
+    def grid(self, value, type:type = CenteredGrid, extrapolation=Material.extrapolation_mode):
         """
         Creates a grid matching the domain by sampling the given value.
 
@@ -97,16 +97,17 @@ class Domain:
 
         :param value: Field or tensor or tensor function
         :param type: class of Grid to create, must be either CenteredGrid or StaggeredGrid
+        :param extrapolation: function: Material -> Extrapolation
         :return: Grid of specified type
         """
         if type is CenteredGrid:
-            return CenteredGrid.sample(value, self.resolution, self.box, Material.extrapolation_mode(self.boundaries))
+            return CenteredGrid.sample(value, self.resolution, self.box, extrapolation(self.boundaries))
         elif type is StaggeredGrid:
-            return StaggeredGrid.sample(value, self.resolution, self.box, Material.extrapolation_mode(self.boundaries))
+            return StaggeredGrid.sample(value, self.resolution, self.box, extrapolation(self.boundaries))
         else:
             raise ValueError('Unknown grid type: %s' % type)
 
-    def vec_grid(self, value, type:type = CenteredGrid):
+    def vec_grid(self, value, type:type = CenteredGrid, extrapolation=Material.vector_extrapolation_mode):
         """
         Creates a vector grid matching the domain by sampling the given value.
 
@@ -114,19 +115,21 @@ class Domain:
 
         :param value: Field or tensor or tensor function
         :param type: class of Grid to create, must be either CenteredGrid or StaggeredGrid
+        :param extrapolation: function: Material -> Extrapolation
         :return: Grid of specified type
         """
         if type is CenteredGrid:
-            grid = CenteredGrid.sample(value, self.resolution, self.box, Material.vector_extrapolation_mode(self.boundaries))
+            grid = CenteredGrid.sample(value, self.resolution, self.box, extrapolation(self.boundaries))
+            if grid.shape.channel.rank == 0:
+                grid = grid.with_data(math.expand_tile(grid.data, size=self.rank, name=0))
+            else:
+                assert grid.shape.channel.sizes[0] == self.rank
+            return grid
         elif type is StaggeredGrid:
-            grid = StaggeredGrid.sample(value, self.resolution, self.box, Material.vector_extrapolation_mode(self.boundaries))
+            return StaggeredGrid.sample(value, self.resolution, self.box, extrapolation(self.boundaries))
         else:
             raise ValueError('Unknown grid type: %s' % type)
-        if grid.shape.channel.rank == 0:
-            grid = grid.with_data(math.add_channel_dim(grid.data, size=self.rank, name=0))
-        else:
-            assert grid.shape.channel.sizes[0] == self.rank
-        return grid
+
 
     def surface_material(self, axis=0, upper_boundary=False):
         return collapsed_gather_nd(self.boundaries, axis, upper_boundary)
