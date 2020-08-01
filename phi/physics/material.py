@@ -87,11 +87,11 @@ For vector fields that respect boundaries (e.g. velocity), use vector_extrapolat
     @struct.derived()
     def accessible_extrapolation_mode(self):
         if self.periodic:
-            return extrapolation.PERIODIC
+            return extrapolation.ONE
         if self.solid:
             return extrapolation.ZERO
         else:
-            return extrapolation.BOUNDARY
+            return extrapolation.ONE
 
     @struct.derived()
     def vector_extrapolation_mode(self):

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from phi import math
 from phi.geom import Geometry
-from phi.math import Shape
+from phi.math import Shape, AbstractTensor
 
 
 class Field:
@@ -21,7 +22,7 @@ class Field:
         raise NotImplementedError(self)
 
     @property
-    def points(self):
+    def points(self) -> AbstractTensor:
         return self.elements.center
 
     @property
@@ -43,7 +44,7 @@ class Field:
         """
         return self.shape.spatial.rank
 
-    def sample_at(self, points, reduce_channels=()):
+    def sample_at(self, points, reduce_channels=()) -> AbstractTensor:
         """
         Sample this field at the world-space locations (in physical units) given by points.
 
@@ -68,26 +69,6 @@ class Field:
         """
         # * **Field**. The values of that field are interpreted as the sample locations. Analytic fields cannot be used.
         raise NotImplementedError(self)
-
-    def _resample_to(self, representation: Field) -> Field:
-        return NotImplemented
-
-    def _resample_from(self, data: Field) -> Field:
-        return NotImplemented
-
-    # def resample(self, other: Field) -> Field:
-    #     """
-    #     Changes the underlying data structure of this Field to one that matches the other.
-    #     This typically involves interpolation.
-    #
-    #     Note that the values of other are ignored by this method, only its sample points are of concern.
-    #
-    #     This method differs from sample_at(other.elements) in that not all components may be sampled at all points.
-    #
-    #     :param other: Field with discrete data structure (other.elements must not be None)
-    #     :return: Field of same type as other
-    #     """
-    #     raise NotImplementedError(self)
 
     def unstack(self, dimension=0) -> tuple:
         """
@@ -155,15 +136,3 @@ class Field:
 class IncompatibleFieldTypes(Exception):
     def __init__(self, *args):
         Exception.__init__(self, *args)
-
-
-def resample(data: Field, representation: Field):
-    result = data._resample_to(representation)
-    if result != NotImplemented:
-        return result
-    result = representation._resample_from(data)
-    if result != NotImplemented:
-        return result
-    elements = representation.elements
-    resampled = data.sample_at(elements, reduce_channels=elements.shape.non_channel.without(representation.shape).names)
-    return representation.with_data(resampled)

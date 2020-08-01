@@ -140,7 +140,7 @@ def abs_square(complex):
 
 # Gradient
 
-def gradient(tensor, dx=1, difference='forward', padding='replicate', axes=None):
+def gradient(tensor, dx=1, difference='central', padding=extrapolation.BOUNDARY, axes=None):
     """
     Calculates the gradient of a scalar channel from finite differences.
     The gradient vectors are in reverse order, lowest dimension first.
@@ -165,7 +165,8 @@ def gradient(tensor, dx=1, difference='forward', padding='replicate', axes=None)
 def _gradient_nd(x_, padding, relative_shifts, axes):
     x = tensor(x_)
     axes = axes if axes is not None else x.shape.spatial.names
-    x = math.pad(x, {axis: (-relative_shifts[0], relative_shifts[1]) for axis in axes}, mode=padding)
+    if padding is not None:
+        x = math.pad(x, {axis: (-relative_shifts[0], relative_shifts[1]) for axis in axes}, mode=padding)
     components = {}
     for dimension in axes:
         lower, upper = _multi_roll(x, dimension, relative_shifts, diminish_others=(-relative_shifts[0], relative_shifts[1]), names=axes)
@@ -212,7 +213,8 @@ def _sliced_laplace_nd(x_, dx, padding, axes=None):
         axis_dx = x.shape.spatial.sequence_get(dx, axis)
         lower, center, upper = _multi_roll(x, axis, (-1, 0, 1), diminish_others=(1, 1), names=axes)
         components.append((upper + lower - 2 * center) / axis_dx ** 2)
-    return math.sum(components, 0)
+    result = math.sum(components, 0)
+    return result
 
 
 @mappable()

@@ -1,10 +1,10 @@
 from phi.flow import *
 
 domain = Domain([64, 64], boundaries=PERIODIC, box=box[0:100, 0:100])
-# velocity = domain.grid(Noise((2,))) * 2
-# velocity = domain.grid(Noise((2,)), type=StaggeredGrid) * 2
+# velocity = domain.vec_grid(Noise((2,))) * 2
+# velocity = domain.vec_grid(Noise((2,)), type=StaggeredGrid) * 2
 
-velocity = domain.vec_grid(mask(Sphere([50, 50], radius=15))) #  * [2, 0] + [1, 0]
+velocity = domain.vec_grid(mask(Sphere([50, 50], radius=15)), StaggeredGrid) * [2, 0] + [1, 0]
 assert velocity.shape.channel.volume == 2
 
 
@@ -15,6 +15,7 @@ def step():
 
 
 step()
+velocity.at_centers()
 
 app = App('Burgers Equation in %dD' % len(domain.resolution), framerate=5)
 app.add_field('Velocity', lambda: velocity)

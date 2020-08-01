@@ -12,7 +12,7 @@ from ._tensor_math import (
     transpose,
     batch_stack, spatial_stack, channel_stack,
     concat,
-    pad,
+    pad, spatial_pad,
     resample,
     reshape,
     prod,
@@ -46,7 +46,7 @@ from ._tensor_math import (
     cast,
     sin, cos,
     dtype,
-    tile, expand_tile,
+    tile, expand_channel,
     sparse_tensor,
     close, assert_close,
 )
@@ -64,3 +64,5 @@ from . import _optim as optim
 # Setup Backend
 DYNAMIC_BACKEND.add_backend(SCIPY_BACKEND)
 DYNAMIC_BACKEND.add_backend(StructBroadcastBackend(DYNAMIC_BACKEND))
+
+choose_backend = DYNAMIC_BACKEND.choose_backend

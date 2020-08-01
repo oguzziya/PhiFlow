@@ -8,7 +8,7 @@ from phi.math import optim
 from phi.math._helper import _dim_shifted
 from phi.physics.material import Material
 from phi.struct.tensorop import collapsed_gather_nd
-from .solver_api import PoissonSolver, FluidDomain
+from .solver_api import PoissonSolver
 
 
 class SparseSciPy(PoissonSolver):

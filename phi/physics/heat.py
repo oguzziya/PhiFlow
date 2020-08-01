@@ -1,5 +1,4 @@
 from .effect import effect_applied
-from phi.field._util import diffuse
 from .physics import Physics, StateDependency
 
 

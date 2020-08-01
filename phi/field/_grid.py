@@ -8,9 +8,9 @@ from phi.geom import AABox, GridCell, Geometry
 from phi.geom import assert_same_rank
 from phi.struct.functions import mappable
 from phi.struct.tensorop import collapse
-from ._field import Field, resample
+from ._field import Field
 from ..backend import Extrapolation, general_grid_sample_nd
-from ..math import Shape, tensor
+from ..math import Shape, tensor, AbstractTensor
 
 
 class Grid(Field, ABC):
@@ -21,22 +21,26 @@ class Grid(Field, ABC):
         self._box = AABox.to_box(box, resolution_hint=resolution)
 
     @property
-    def box(self):
+    def box(self) -> AABox:
         return self._box
 
     @property
-    def resolution(self):
+    def resolution(self) -> Shape:
         return self.shape.spatial.with_linear_indices()
 
     @property
-    def dx(self):
+    def dx(self) -> AbstractTensor:
         return self.box.size / self.resolution
 
     @property
-    def extrapolation(self):
+    def extrapolation(self) -> Extrapolation:
         return self._extrapolation
 
-    def with_data(self, data):
+    @property
+    def data(self) -> AbstractTensor:
+        raise NotImplementedError()
+
+    def with_data(self, data: AbstractTensor):
         raise NotImplementedError()
 
 

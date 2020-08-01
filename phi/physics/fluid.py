@@ -2,19 +2,21 @@
 Definition of Fluid, IncompressibleFlow as well as fluid-related functions.
 """
 import warnings
+from functools import partial
 from numbers import Number
 
 import numpy as np
 
-from phi import math, struct
+from phi import math, struct, field
 from phi.geom import union
-from phi.field import Field, mask, AngularVelocity, advect, CenteredGrid, StaggeredGrid, resample
+from phi.field import Field, mask, AngularVelocity, CenteredGrid, StaggeredGrid, resample, Grid
 
 from .domain import Domain, DomainState
 from .effect import Gravity, effect_applied, gravity_tensor, FieldEffect, FieldPhysics
 from .material import OPEN, Material
 from .physics import Physics, StateDependency
-from .pressuresolver.solver_api import FluidDomain, poisson_solve
+from .pressuresolver.solver_api import poisson_solve
+from . import advect
 
 
 @struct.definition()
@@ -210,7 +212,7 @@ Computes the pressure from the given velocity divergence using the specified sol
     return poisson_solve(divergence, fluiddomain, solver=pressure_solver, guess=guess)
 
 
-def divergence_free(velocity, domain=None, obstacles=(), pressure_solver=None, return_info=False, gradient='implicit'):
+def divergence_free(velocity: Grid, domain: Domain, obstacles=(), pressure_solver=None, return_info=False, gradient='implicit'):
     """
 Projects the given velocity field by solving for and subtracting the pressure.
     :param return_info: if True, returns a dict holding information about the solve as a second object
@@ -220,28 +222,36 @@ Projects the given velocity field by solving for and subtracting the pressure.
     :param pressure_solver: PressureSolver. Uses default solver if none provided.
     :return: divergence-free velocity as StaggeredGrid
     """
-    assert isinstance(velocity, StaggeredGrid)
-    # --- Set up FluidDomain ---
-    if domain is None:
-        domain = Domain(velocity.resolution, OPEN)
     obstacle_mask = mask(union([obstacle.geometry for obstacle in obstacles]), antialias=False)
     if obstacle_mask is not None:
-        obstacle_grid = CenteredGrid.sample(obstacle_mask, domain.resolution, domain.box, math.extrapolation.ZERO)
+        obstacle_grid = CenteredGrid.sample(obstacle_mask, velocity.resolution, velocity.box, math.extrapolation.ZERO)
         active_mask = 1 - obstacle_grid
     else:
-        active_mask = math.ones(domain.centered_shape(extrapolation=math.extrapolation.ZERO))
+        active_mask = CenteredGrid.sample(1, velocity.resolution, velocity.box, math.extrapolation.ZERO)
     accessible_mask = CenteredGrid(active_mask.data, active_mask.box, Material.accessible_extrapolation_mode(domain.boundaries))
-    fluiddomain = FluidDomain(domain, active=active_mask, accessible=accessible_mask)
-    # --- Boundary Conditions, Pressure Solve ---
-    velocity = fluiddomain.with_hard_boundary_conditions(velocity)
+    # --- Boundary Conditions---
+    hard_bcs = _frictionless_velocity_mask(accessible_mask)
+    velocity *= hard_bcs
     for obstacle in obstacles:
         if not obstacle.is_stationary:
             obs_mask = mask(obstacle.geometry, antialias=True)
             angular_velocity = AngularVelocity(location=obstacle.geometry.center, strength=obstacle.angular_velocity, falloff=None)
             velocity = ((1 - obs_mask) * velocity + obs_mask * (angular_velocity + obstacle.velocity)).at(velocity)
-    divergence_field = velocity.divergence(physical_units=False)
-    pressure, iterations = poisson_solve(divergence_field, fluiddomain, solver=pressure_solver, gradient=gradient)
-    pressure *= velocity.dx[0]
-    gradp = StaggeredGrid.gradient(pressure)
-    velocity -= fluiddomain.with_hard_boundary_conditions(gradp)
-    return velocity if not return_info else (velocity, {'pressure': pressure, 'iterations': iterations, 'divergence': divergence_field})
+    # --- Pressure solve ---
+    divergence_field = field.divergence(velocity)
+    pressure_guess = domain.grid(0)
+    laplace_fun = partial(laplace_pressure, active=active_mask, accessible=accessible_mask)
+    pressure_solve = field.optim.conjugate_gradient(laplace_fun, divergence_field, pressure_guess, accuracy=1e-3, max_iterations=1000, back_prop=False)  # TODO gradient=gradient
+    pressure = pressure_solve.x
+    gradp = field.staggered_gradient(pressure)
+    gradp *= hard_bcs
+    velocity -= gradp
+    return velocity if not return_info else (velocity, {'pressure': pressure, 'iterations': pressure_solve.iterations, 'divergence': divergence_field})
+
+
+def _frictionless_velocity_mask(accessible: CenteredGrid):
+    return field.stagger(accessible, math.minimum)
+
+
+def laplace_pressure(pressure: CenteredGrid, active: CenteredGrid, accessible: CenteredGrid):
+    return field.laplace(pressure)  # TODO

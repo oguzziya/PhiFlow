@@ -1,45 +1,26 @@
-# coding=utf-8
 import itertools
+from functools import wraps
 
 import numpy as np
-from numpy import pi
-from phi import math, struct
+from phi import math
 from phi.geom import AABox
 from phi.field import StaggeredGrid, ConstantField, Grid, CenteredGrid
 from ._field import Field
-from ._field_math import laplace, squared, fftfreq, fft, ifft, real
 
 
-def diffuse(field, diffusivity, dt, substeps=1):
-    u"""
-Simulate a finite-time diffusion process of the form dF/dt = α · ΔF on a given `Field` F with diffusion coefficient α.
-
-If `field` is periodic (set via `extrapolation='periodic'`), diffusion may be simulated in Fourier space.
-Otherwise, finite differencing is used to approximate the
-    :param field: CenteredGrid, StaggeredGrid or ConstantField
-    :param amount: number of Field, typically α · dt
-    :param substeps: number of iterations to use
-    :return: Field of same type as `field`
-    :rtype: Field
-    """
-    if isinstance(field, ConstantField):
-        return field
-    assert isinstance(field, Grid), "Cannot diffuse field of type '%s'" % type(field)
-    amount = diffusivity * dt
-    if field.extrapolation == 'periodic' and not isinstance(amount, Field):
-        fft_laplace = -(2 * pi) ** 2 * squared(fftfreq(field))
-        diffuse_kernel = math.exp(fft_laplace * amount)
-        return real(ifft(fft(field) * diffuse_kernel))
-    else:
-        if isinstance(amount, Field):
-            amount = amount.at(field)
-        for i in range(substeps):
-            field += amount / substeps * laplace(field)
-        return field
+def resample(data: Field, representation: Grid):
+    elements = representation.elements
+    resampled = data.sample_at(elements, reduce_channels=elements.shape.non_channel.without(representation.shape).names)
+    extrap = data.extrapolation if isinstance(data, Grid) else representation.extrapolation
+    return representation._op1(lambda old: extrap if isinstance(old, math.extrapolation.Extrapolation) else resampled)
 
 
-# def resample(field: Field, other: Field):
-#     other.elements
+def expose_tensors(field_function, *proto_fields):
+    @wraps(field_function)
+    def wrapper(*field_data):
+        fields = [proto.with_data(data) for data, proto in zip(field_data, proto_fields)]
+        return field_function(*fields).data
+    return wrapper
 
 
 def data_bounds(field):
@@ -53,16 +34,6 @@ def data_bounds(field):
         min_vec = math.min([b.lower for b in boxes], axis=0)
         max_vec = math.max([b.upper for b in boxes], axis=0)
     return AABox(min_vec, max_vec)
-
-
-def staggered_curl_2d(grid, pad_width=(1, 2)):
-    assert isinstance(grid, CenteredGrid)
-    kernel = math.zeros((3, 3, 1, 2))
-    kernel[1, :, 0, 0] = [0, 1, -1]  # y-component: - dz/dx
-    kernel[:, 1, 0, 1] = [0, -1, 1]  # x-component: dz/dy
-    scalar_potential = grid.padded([pad_width, pad_width]).data
-    vector_field = math.conv(scalar_potential, kernel, padding='valid')
-    return StaggeredGrid(vector_field, box=grid.box)
 
 
 def extrapolate(input_field, valid_mask, voxel_distance=10):

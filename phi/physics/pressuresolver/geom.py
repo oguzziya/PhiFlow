@@ -1,10 +1,10 @@
 from numbers import Number
 
-from phi import math
+from phi import math, field
 from phi.math import optim
 from phi.math._helper import _dim_shifted
 from phi.field import CenteredGrid
-from .solver_api import PoissonDomain, PoissonSolver
+from .solver_api import PoissonSolver
 from phi.physics.material import Material
 
 
@@ -19,24 +19,19 @@ Obstacles are allowed to vary between examples but the same number of iterations
 
         :param accuracy: the maximally allowed error on the divergence channel for each cell
         :param max_iterations: integer specifying maximum conjugent gradient loop iterations or None for no limit
-        :param autodiff:
         """
         PoissonSolver.__init__(self, 'Single-Phase Conjugate Gradient', supported_devices=('CPU', 'GPU', 'TPU'), supports_guess=True, supports_loop_counter=True, supports_continuous_masks=True)
-        assert math.is_scalar(accuracy), 'invalid accuracy: %s' % accuracy
         self.accuracy = accuracy
         self.max_iterations = max_iterations
 
-    def solve(self, divergence, domain, guess, enable_backprop):
-        assert isinstance(domain, PoissonDomain)
-        fluid_mask = domain.accessible_tensor(extend=1)
-        extrapolation = Material.extrapolation_mode(domain.domain.boundaries)
+    def solve(self, y, active, accessible, x0: CenteredGrid, enable_backprop):
 
-        def apply_A(pressure):
-            pressure = CenteredGrid(pressure, extrapolation=extrapolation)
-            pressure_padded = pressure.padded([[1, 1]] * pressure.rank)
-            return _weighted_sliced_laplace_nd(pressure_padded.data, weights=fluid_mask)
+        def masked_laplace(x):
+            x = x0.with_data(x)
+            return field.laplace(x).data
 
-        return optim.conjugate_gradient(divergence, apply_A, guess, self.accuracy, self.max_iterations, back_prop=enable_backprop)
+        result, iterations = math.optim.conjugate_gradient(masked_laplace, y, x0, self.accuracy, self.max_iterations, back_prop=enable_backprop)
+        return x0.with_data(result), iterations
 
 
 def _weighted_sliced_laplace_nd(tensor, weights):

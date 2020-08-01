@@ -58,17 +58,41 @@ def concat(values, axis):
     return NativeTensor(concatenated, values[0].shape)
 
 
-def pad(value, pad_width, mode=extrapolation.ZERO):
-    assert isinstance(value, AbstractTensor)
-    if isinstance(pad_width, dict):  # name -> (lower, upper) or both
-        if isinstance(value, NativeTensor):
-            native = value.tensor
-            ordered_pad_widths = value.shape.order(pad_width, default=0)
-            ordered_mode = value.shape.order(mode, default=extrapolation.ZERO)
-            result_tensor = math.pad(native, ordered_pad_widths, ordered_mode)
-            new_shape = value.shape.with_sizes(math.staticshape(result_tensor))
-            return NativeTensor(result_tensor, new_shape)
-    raise NotImplementedError()
+def spatial_pad(value, pad_width, mode=extrapolation.ZERO):
+    value = tensor(value)
+    return pad(value, {n: w for n, w in zip(value.shape.spatial.names, pad_width)}, mode=mode)
+
+
+def pad(value, pad_width: dict, mode=extrapolation.ZERO):
+    """
+
+    :param value:
+    :param pad_width: name -> (lower, upper) or both
+    :param mode:
+    :return:
+    """
+    value = tensor(value)
+    assert isinstance(pad_width, dict)
+    if isinstance(value, NativeTensor):
+        native = value.tensor
+        ordered_pad_widths = value.shape.order(pad_width, default=0)
+        ordered_mode = value.shape.order(mode, default=extrapolation.ZERO)
+        result_tensor = math.pad(native, ordered_pad_widths, ordered_mode)
+        new_shape = value.shape.with_sizes(math.staticshape(result_tensor))
+        return NativeTensor(result_tensor, new_shape)
+    elif isinstance(value, CollapsedTensor):
+        inner = pad(value.tensor, pad_width, mode=mode)
+        new_sizes = []
+        for size, dim, dim_type in value.shape.dimensions:
+            if dim not in pad_width:
+                new_sizes.append(size)
+            else:
+                delta = sum(pad_width[dim]) if isinstance(pad_width[dim], (tuple, list)) else 2 * pad_width[dim]
+                new_sizes.append(size + delta)
+        new_shape = value.shape.with_sizes(new_sizes)
+        return CollapsedTensor(inner, new_shape)
+    else:
+        raise NotImplementedError()
 
 
 def resample(inputs, sample_coords, interpolation='linear', boundary=extrapolation.ZERO):
@@ -134,30 +158,55 @@ def prod(value, axis=None):
 
 
 def divide_no_nan(x, y):
-    raise NotImplementedError()
+    x = tensor(x)
+    return x._op2(y, lambda t1, t2: math.divide_no_nan(t1, t2))
 
 
 def where(condition, x=None, y=None):
     raise NotImplementedError()
 
 
-def sum(value: AbstractTensor, axis=None):
-    if isinstance(value, AbstractTensor):
-        if isinstance(axis, int) and axis < 0:
-            raise ValueError('axis argument must be the name of the dimension, not its position')
-        result = math.sum(value.native(), axis=value.shape.index(axis), keepdims=False)
-        return NativeTensor(result, value.shape.without(axis))
-    else:
+def sum(value: AbstractTensor or list or tuple, axis=None):
+    if axis == () or axis == []:
+        return value
+    if isinstance(value, (tuple, list)):
+        values = [tensor(v) for v in value]
+        value = _stack(values, '_sum', BATCH_DIM)
         if axis is None:
-            values = [sum(v).native() for v in value]
-            result_scalar = math.sum(values)
-            return NativeTensor(result_scalar, EMPTY_SHAPE)
+            pass  # continue below
         elif axis == 0:
-            shape, tensors = broadcastable_native_tensors(*value)
-            result_tensor = math.sum(tensors, axis=0, keepdims=False)
-            return NativeTensor(result_tensor, shape)
+            axis = '_sum'
         else:
-            raise NotImplementedError()
+            raise ValueError('axis must be 0 or None when passing a sequence of tensors')
+    else:
+        value = tensor(value)
+    axes = _axis(axis, value.shape)
+    if isinstance(value, NativeTensor):
+        result = math.sum(value.native(), axis=value.shape.index(axes))
+        return NativeTensor(result, value.shape.without(axes))
+    elif isinstance(value, TensorStack):
+        # --- inner sums ---
+        inner_axes = [ax for ax in axes if ax != value.stack_dim_name]
+        sums = [sum(t, inner_axes) for t in value.tensors]
+        # --- outer sum ---
+        if value.stack_dim_name in axes:
+            natives = [t.native() for t in sums]
+            result = math.sum(natives, axis=0)
+            return NativeTensor(result, sums[0].shape)
+        else:
+            TensorStack(sums, value.stack_dim_name, value.stack_dim_type, keep_separate=value.keep_separate)
+    else:
+        raise NotImplementedError()
+
+
+def _axis(axis, shape: Shape):
+    if axis is None:
+        return shape.names
+    if isinstance(axis, (tuple, list)):
+        return axis
+    if isinstance(axis, (str, int)):
+        return [axis]
+    raise ValueError(axis)
 
 
 def mean(value, axis=None):
@@ -365,7 +414,8 @@ def tile(value, multiples):
 
 def expand_channel(x, dim_size, dim_name):
     x = tensor(x)
-
+    shape = x.shape.plus(dim_size, dim_name, CHANNEL_DIM)
+    return CollapsedTensor(x, shape)
 
 
 def sparse_tensor(indices, values, shape):

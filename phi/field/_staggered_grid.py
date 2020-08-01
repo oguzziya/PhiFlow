@@ -60,6 +60,10 @@ class StaggeredGrid(Grid):
                 tensors.append(math.zeros(comp_res) + value)
             return StaggeredGrid(math.channel_stack(tensors), box, extrapolation)
 
+    @property
+    def data(self):
+        return self._data
+
     def with_data(self, data):
         if isinstance(data, StaggeredGrid):
             return StaggeredGrid(data._data, self._box, self._extrapolation)
@@ -82,13 +86,13 @@ class StaggeredGrid(Grid):
             channels = [component.sample_at(p) for p, component in zip(points, self.unstack())]
         return math.channel_stack(channels)
 
-    def _resample_to(self, representation: Field) -> Field:
-        if isinstance(representation, StaggeredGrid) and representation.box == self.box and np.allclose(representation.resolution, self.resolution):
-            return self
-        points = representation.points
-        resampled = [centeredgrid.at(representation) for centeredgrid in self.data]
-        data = math.concat([field.data for field in resampled], -1)
-        return representation.copied_with(data=data, flags=propagate_flags_resample(self, representation.flags, representation.rank))
+    # def _resample_to(self, representation: Field) -> Field:
+    #     if isinstance(representation, StaggeredGrid) and representation.box == self.box and np.allclose(representation.resolution, self.resolution):
+    #         return self
+    #     points = representation.points
+    #     resampled = [centeredgrid.at(representation) for centeredgrid in self.data]
+    #     data = math.concat([field.data for field in resampled], -1)
+    #     return representation.copied_with(data=data, flags=propagate_flags_resample(self, representation.flags, representation.rank))
 
     def at_centers(self):
         centered = []
@@ -150,16 +154,6 @@ class StaggeredGrid(Grid):
 
     def staggered_tensor(self):
         return stack_staggered_components(self._data)
-
-    # def divergence(self, physical_units=True):
-    #     components = []
-    #     for dim, field in enumerate(self.data):
-    #         grad = math.axis_gradient(field.data, dim)
-    #         if physical_units:
-    #             grad /= self.dx[dim]
-    #         components.append(grad)
-    #     data = math.sum(components, 0)
-    #     return CenteredGrid(data, self.box, name='div(%s)' % self.name, batch_size=self._batch_size)
     #
     # def padded(self, widths):
     #     new_grids = [grid.padded(widths) for grid in self.unstack()]
@@ -177,20 +171,6 @@ class StaggeredGrid(Grid):
     #         grid = math.downsample2x(grid, axes=tuple(filter(lambda ax2: ax2 != axis, range(self.rank))))  # Interpolate values along other axes
     #         data.append(grid)
     #     return self.with_data(data)
-
-    # @staticmethod
-    # def gradient(scalar_field, padding_mode='replicate'):
-    #     assert isinstance(scalar_field, CenteredGrid)
-    #     data = scalar_field.data
-    #     if data.shape[-1] != 1:
-    #         raise ValueError('input must be a scalar field')
-    #     tensors = []
-    #     for dim in math.spatial_dimensions(data):
-    #         upper = math.pad(data, [[0,1] if d == dim else [0,0] for d in math.all_dimensions(data)], padding_mode)
-    #         lower = math.pad(data, [[1,0] if d == dim else [0,0] for d in math.all_dimensions(data)], padding_mode)
-    #         tensors.append((upper - lower) / scalar_field.dx[dim - 1])
-    #     return StaggeredGrid(tensors, scalar_field.box, name='grad(%s)' % scalar_field.name,
-    #                          batch_size=scalar_field._batch_size)
 
 
 def unstack_staggered_tensor(tensor):

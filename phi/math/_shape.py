@@ -45,22 +45,26 @@ class Shape:
 
     @property
     def indices(self):
-        return tuple(self._indices)
+        return tuple(int(i) for i in self._indices)
 
     def with_linear_indices(self):
         return Shape(self._sizes, self._names, self._types)
 
     @property
     def named_sizes(self):
-        return {name: size for name, size in zip(self._names, self._sizes)}.items()
+        return {name: size for name, size in zip(self._names, self.sizes)}.items()
 
     @property
     def dimensions(self):
-        return zip(self._sizes, self._names, self._types)
+        return zip(self.sizes, self._names, self._types)
 
     @property
     def indexed_dimensions(self):
-        return zip(self._indices, self._sizes, self._names, self._types)
+        return zip(self.indices, self.sizes, self._names, self._types)
+
+    @property
+    def indexed_names(self):
+        return zip(self.indices, self._names)
 
     @property
     def enumerated_names(self):
@@ -241,12 +245,6 @@ class Shape:
         Add a dimension to the shape.
 
         The resulting shape has linear indices.
-
-        :param size:
-        :param name:
-        :param dim_type:
-        :param pos:
-        :return:
         """
         if pos is None:
             same_type_dims = self.filtered(self._types == dim_type)
