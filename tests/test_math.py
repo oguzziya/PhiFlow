@@ -7,7 +7,7 @@ from phi.tf import tf
 
 # pylint: disable-msg = redefined-builtin, redefined-outer-name, unused-wildcard-import, wildcard-import
 from phi.math import *
-from phi.backend.backend_helper import general_grid_sample_nd as helper_resample
+from phi.backend import general_grid_sample_nd as helper_resample
 from phi.math import extrapolation
 
 
@@ -15,6 +15,8 @@ from phi.math import extrapolation
 
 
 class TestMath(TestCase):
+
+
 
     def test_fft(self):
         tf.InteractiveSession()

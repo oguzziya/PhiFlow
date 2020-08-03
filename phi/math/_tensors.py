@@ -277,7 +277,7 @@ class AbstractTensor:
         return NativeTensor(result_tensor, new_shape)
 
     def _op1(self, native_function):
-        return NativeTensor(native_function(self.native()), self.shape)
+        raise NotImplementedError()
 
 
 class _TensorDim:
@@ -391,6 +391,16 @@ class NativeTensor(AbstractTensor):
         new_shape = self.shape.without(dimension)
         tensors = native_math.unstack(self.tensor, axis=dim_index)
         return tuple([NativeTensor(t, new_shape) for t in tensors])
+
+    def _op1(self, native_function):
+        return NativeTensor(native_function(self.native()), self.shape)
+
+    def _op2(self, other, native_function):
+        other = self._tensor(other)
+        if self.shape == other.shape:
+            return NativeTensor(native_function(self.tensor, other.native()), self.shape)
+        else:
+            return AbstractTensor._op2(self, other, native_function)
 
 
 class CollapsedTensor(AbstractTensor):
