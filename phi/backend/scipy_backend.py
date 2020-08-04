@@ -5,8 +5,10 @@ import warnings
 import numpy as np
 import scipy.signal
 import scipy.sparse
+from scipy.sparse.linalg import cg, LinearOperator
 
 from . import Backend, extrapolation, split_multi_mode_pad, PadSettings, general_grid_sample_nd
+from ._backend_helper import combined_dim
 
 
 class SciPyBackend(Backend):
@@ -373,6 +375,33 @@ class SciPyBackend(Backend):
 
     def sparse_tensor(self, indices, values, shape):
         return scipy.sparse.csc_matrix((values, self.unstack(indices, -1)), shape=shape)
+
+    def conjugate_gradient(self, A, y, x0, relative_tolerance: float = 1e-5, absolute_tolerance: float = 0.0, max_iterations: int = 1000, gradient: str = 'implicit', callback=None):
+        bs_y = self.staticshape(y)[0]
+        bs_x0 = self.staticshape(x0)[0]
+        batch_size = combined_dim(bs_y, bs_x0)
+
+        if callable(A):
+            A = LinearOperator(dtype=y.dtype, shape=(self.staticshape(y)[-1], self.staticshape(x0)[-1]), matvec=A)
+        elif isinstance(A, (tuple, list)) or self.ndims(A) == 3:
+            batch_size = combined_dim(batch_size, self.staticshape(A)[0])
+
+        iterations = [0] * batch_size
+        converged = []
+        results = []
+
+        def count_callback(*args):
+            iterations[batch] += 1
+            if callback is not None:
+                callback(*args)
+
+        for batch in range(batch_size):
+            y_ = y[min(batch, bs_y - 1)]
+            x0_ = x0[min(batch, bs_x0 - 1)]
+            x, ret_val = cg(A, y_, x0_, tol=relative_tolerance, atol=absolute_tolerance, maxiter=max_iterations, callback=count_callback)
+            converged.append(ret_val == 0)
+            results.append(x)
+        return np.array(converged), self.stack(results), np.array(iterations)
 
 
 def clamp(coordinates, shape):

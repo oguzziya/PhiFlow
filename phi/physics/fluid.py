@@ -212,14 +212,13 @@ Computes the pressure from the given velocity divergence using the specified sol
     return poisson_solve(divergence, fluiddomain, solver=pressure_solver, guess=guess)
 
 
-def divergence_free(velocity: Grid, domain: Domain, obstacles=(), pressure_solver=None, return_info=False, gradient='implicit'):
+def divergence_free(velocity: Grid, domain: Domain, obstacles=(), relative_tolerance: float = 1e-5, absolute_tolerance: float = 0.0, max_iterations: int = 1000, return_info=False, gradient='implicit'):
     """
 Projects the given velocity field by solving for and subtracting the pressure.
     :param return_info: if True, returns a dict holding information about the solve as a second object
     :param velocity: StaggeredGrid
     :param domain: Domain matching the velocity field, used for boundary conditions
     :param obstacles: list of Obstacles
-    :param pressure_solver: PressureSolver. Uses default solver if none provided.
     :return: divergence-free velocity as StaggeredGrid
     """
     obstacle_mask = mask(union([obstacle.geometry for obstacle in obstacles]), antialias=False)
@@ -241,12 +240,13 @@ Projects the given velocity field by solving for and subtracting the pressure.
     divergence_field = field.divergence(velocity)
     pressure_guess = domain.grid(0)
     laplace_fun = partial(laplace_pressure, active=active_mask, accessible=accessible_mask)
-    pressure_solve = field.optim.conjugate_gradient(laplace_fun, divergence_field, pressure_guess, accuracy=1e-3, max_iterations=1000, back_prop=False)  # TODO gradient=gradient
-    pressure = pressure_solve.x
+    converged, pressure, iterations = field.conjugate_gradient(laplace_fun, divergence_field, pressure_guess, relative_tolerance, absolute_tolerance, max_iterations, gradient)
+    if not math.all(converged):
+        raise ValueError('pressure solve did not converge')
     gradp = field.staggered_gradient(pressure)
     gradp *= hard_bcs
     velocity -= gradp
-    return velocity if not return_info else (velocity, {'pressure': pressure, 'iterations': pressure_solve.iterations, 'divergence': divergence_field})
+    return velocity if not return_info else (velocity, {'pressure': pressure, 'iterations': iterations, 'divergence': divergence_field})
 
 
 def _frictionless_velocity_mask(accessible: CenteredGrid):

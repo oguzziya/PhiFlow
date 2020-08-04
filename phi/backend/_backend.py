@@ -325,6 +325,24 @@ If `multiples` has more dimensions than `value`, these dimensions are added to `
     def sparse_tensor(self, indices, values, shape):
         raise NotImplementedError(self)
 
+    def conjugate_gradient(self, A, y, x0, relative_tolerance: float = 1e-5, absolute_tolerance: float = 0.0, max_iterations: int = 1000, gradient: str = 'implicit', callback=None):
+        """
+        Solve the system of linear equations
+          A * x = y
+
+        :param A: batch of sparse / dense matrices or or linear function A(x). 3rd order tensor or list of matrices.
+        :param y: target result of A * x. 2nd order tensor (batch, vector) or list of vectors.
+        :param x0: initial guess for x. 2nd order tensor (batch, vector) or list of vectors.
+        :param relative_tolerance: stops when norm(residual) <= max(relative_tolerance * norm(y), absolute_tolerance)
+        :param absolute_tolerance: stops when norm(residual) <= max(relative_tolerance * norm(y), absolute_tolerance)
+        :param max_iterations: maximum number of iterations or None for unlimited
+        :param gradient: one of ('implicit', 'inverse', 'autodiff')
+        :param callback: Function to call after each iteration. It is called with the current solution as callback(x).
+        :rtype: tuple
+        :return: converged, solution, iterations
+        """
+        raise NotImplementedError(self)
+
     # --- Math function with default implementation ---
 
     def ndims(self, tensor):

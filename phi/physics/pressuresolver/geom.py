@@ -1,7 +1,6 @@
 from numbers import Number
 
 from phi import math, field
-from phi.math import optim
 from phi.math._helper import _dim_shifted
 from phi.field import CenteredGrid
 from .solver_api import PoissonSolver

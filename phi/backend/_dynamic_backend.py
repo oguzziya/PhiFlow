@@ -251,6 +251,10 @@ class DynamicBackend(Backend):
     def sparse_tensor(self, indices, values, shape):
         return self.choose_backend([indices, values]).sparse_tensor(indices, values, shape)
 
+    def conjugate_gradient(self, A, y, x0, relative_tolerance: float = 1e-5, absolute_tolerance: float = 0.0, max_iterations: int = 1000, gradient: str = 'implicit', callback=None):
+        backend = self.choose_backend([y, x0]) if callable(A) else self.choose_backend([A, y, x0])
+        return backend.conjugate_gradient(A, y, x0, relative_tolerance, absolute_tolerance, max_iterations, gradient, callback)
+
     def dtype(self, array):
         return self.choose_backend(array).dtype(array)
 

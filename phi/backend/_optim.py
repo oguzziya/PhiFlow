@@ -1,7 +1,5 @@
 from collections import namedtuple
 
-from ._tensor_math import to_float, sum, divide_no_nan, einsum, max
-from ._tensors import AbstractTensor
 
 SolveResult = namedtuple('SolveResult', ['iterations', 'x', 'residual'])
 
@@ -43,7 +41,7 @@ def broyden(function, x0, inv_J0, accuracy=1e-5, max_iterations=1000, back_prop=
     return SolveResult(iterations, x_, y_)
 
 
-def conjugate_gradient(function, y: AbstractTensor, x0: AbstractTensor, accuracy=1e-5, max_iterations=1000, back_prop=False) -> SolveResult:
+def conjugate_gradient(function, y, x0, accuracy=1e-5, max_iterations=1000, back_prop=False) -> SolveResult:
     """
     Solve the linear system of equations `A·x=y`  using the conjugate gradient (CG) algorithm.
     A, x and y can have arbitrary matching shapes, i.e. this method can be used to solve vector and matrix equations.

@@ -1,4 +1,4 @@
-from phi.backend import Backend, DYNAMIC_BACKEND, set_precision, extrapolation
+from phi.backend import DYNAMIC_BACKEND, extrapolation
 from phi.backend.scipy_backend import SCIPY_BACKEND
 
 from phi.struct.struct_backend import StructBroadcastBackend
@@ -49,6 +49,7 @@ from ._tensor_math import (
     tile, expand_channel,
     sparse_tensor,
     close, assert_close,
+    conjugate_gradient,
 )
 from ._nd import (
     indices_tensor,
@@ -59,7 +60,6 @@ from ._nd import (
     downsample2x, upsample2x, interpolate_linear,
     spatial_sum, vec_abs
 )
-from . import _optim as optim
 
 # Setup Backend
 DYNAMIC_BACKEND.add_backend(SCIPY_BACKEND)

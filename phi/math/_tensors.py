@@ -277,7 +277,7 @@ class AbstractTensor:
         return NativeTensor(result_tensor, new_shape)
 
     def _op1(self, native_function):
-        raise NotImplementedError()
+        raise NotImplementedError(self.__class__)
 
 
 class _TensorDim:
@@ -461,6 +461,9 @@ class CollapsedTensor(AbstractTensor):
         new_shape = self.shape.after_gather(selection_dict)
         inner.shape.combined(new_shape)  # check that sizes match
         return CollapsedTensor(inner, new_shape)
+
+    def _op1(self, native_function):
+        return CollapsedTensor(self.tensor._op1(native_function), self._shape)
 
 
 class TensorStack(AbstractTensor):

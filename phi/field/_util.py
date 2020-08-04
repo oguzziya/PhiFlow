@@ -23,6 +23,19 @@ def expose_tensors(field_function, *proto_fields):
     return wrapper
 
 
+def conjugate_gradient(function, y: Grid, x0: Grid, relative_tolerance: float = 1e-5, absolute_tolerance: float = 0.0, max_iterations: int = 1000, gradient: str = 'implicit', callback=None):
+    if callback is not None:
+        def field_callback(x):
+            x = x0.with_data(x)
+            callback(x)
+    else:
+        field_callback = None
+
+    data_function = expose_tensors(function, y)
+    converged, x, iterations = math.conjugate_gradient(data_function, y.data, x0.data, relative_tolerance, absolute_tolerance, max_iterations, gradient, field_callback)
+    return converged, x0.with_data(x), iterations
+
+
 def data_bounds(field):
     assert field.has_points
     try:

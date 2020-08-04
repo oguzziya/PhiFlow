@@ -4,7 +4,7 @@ import numpy as np
 
 from ._shape import BATCH_DIM, CHANNEL_DIM, SPATIAL_DIM, Shape, EMPTY_SHAPE
 from ..backend import extrapolation, math
-from ._tensors import AbstractTensor, tensor, broadcastable_native_tensors, NativeTensor, CollapsedTensor, TensorStack
+from ._tensors import AbstractTensor, tensor, broadcastable_native_tensors, NativeTensor, CollapsedTensor, TensorStack, combined_shape
 from ._tensor_initializers import zeros
 from ..backend.scipy_backend import SCIPY_BACKEND
 
@@ -489,3 +489,25 @@ def _assert_close(tensor1, tensor2, rel_tolerance=1e-5, abs_tolerance=0):
     np2 = math.numpy(native2)
     if not np.allclose(np1, np2, rel_tolerance, abs_tolerance):
         np.testing.assert_allclose(np1, np2, rel_tolerance, abs_tolerance)
+
+
+def conjugate_gradient(A, y, x0, relative_tolerance: float = 1e-5, absolute_tolerance: float = 0.0, max_iterations: int = 1000, gradient: str = 'implicit', callback=None):
+    x0, y = tensor(x0, y)
+    batch = combined_shape(y, x0).batch
+    x0_native = math.reshape(x0.native(), (x0.shape.batch.volume, x0.shape.non_batch.volume))
+    y_native = math.reshape(y.native(), (y.shape.batch.volume, y.shape.non_batch.volume))
+    if callable(A):
+        def A_(native_x):
+            x = math.reshape(native_x, x0.shape.non_batch.sizes)
+            x = NativeTensor(x, x0.shape.non_batch)
+            Ax = A(x)
+            Ax_native = math.reshape(Ax.native(), (y.shape.non_batch.volume,))
+            return Ax_native
+    else:
+        A_ = math.reshape(A.native(), (y.shape.non_batch.volume, x0.shape.non_batch.volume))
+
+    converged, x, iterations = math.conjugate_gradient(A_, y_native, x0_native, relative_tolerance, absolute_tolerance, max_iterations, gradient, callback)
+    converged = math.reshape(converged, batch.sizes)
+    x = math.reshape(x, batch.sizes + x0.shape.non_batch.sizes)
+    iterations = math.reshape(iterations, batch.sizes)
+    return NativeTensor(converged, batch), NativeTensor(x, batch.combined(x0.shape.non_batch)), NativeTensor(iterations, batch)
