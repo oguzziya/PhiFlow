@@ -323,7 +323,26 @@ If `multiples` has more dimensions than `value`, these dimensions are added to `
         raise NotImplementedError(self)
 
     def sparse_tensor(self, indices, values, shape):
+        """
+
+        :param indices: tuple/list matching the dimensions (pair for matrix)
+        :param values:
+        :param shape:
+        """
         raise NotImplementedError(self)
+
+    def coordinates(self, tensor, unstack_coordinates=False):
+        """
+        Returns the coordinates and data of a tensor.
+
+        The first returned value is a tensor holding the coordinate vectors in the last dimension if unstack_coordinates=False.
+        In case unstack_coordinates=True, the coordiantes are returned as a tuple of tensors, i.e. (row, col) for matrices
+
+        :param tensor: dense or sparse tensor
+        :return: indices (tensor or tuple), data
+        """
+        raise NotImplementedError(self)
+
 
     def conjugate_gradient(self, A, y, x0, relative_tolerance: float = 1e-5, absolute_tolerance: float = 0.0, max_iterations: int = 1000, gradient: str = 'implicit', callback=None):
         """

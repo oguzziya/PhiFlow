@@ -16,45 +16,6 @@ def _get_pad_width(rank, axis_widths=(1, 1)):
     return [[0, 0]] + [axis_widths] * rank + [[0, 0]]
 
 
-def _dim_shifted(tensor, axis, relative_shifts, components=None, diminish_others=(0, 0), diminish_other_condition=None):
-    assert len(relative_shifts) >= 2
-    total_shift = max(relative_shifts) - min(relative_shifts)
-    # --- Handle diminish_others ---
-    if isinstance(diminish_others, tuple):
-        slice_others = slice(diminish_others[0], -diminish_others[1] if diminish_others[1] != 0 else None)
-    else:
-        raise ValueError("Illegal diminish_others arguemnt: '%s'" % diminish_others)
-    # --- Handle components ---
-    if components is None:
-        component_slice = slice(None)
-    elif isinstance(components, int):
-        component_slice = slice(components, components+1)
-    elif isinstance(components, slice):
-        component_slice = components
-    else:
-        raise ValueError("Illegal components argument: '%s'" % components)
-    # --- Slice tensor to create shifts ---
-    rank = spatial_rank(tensor)
-    shifted_tensors = []
-    for shift in relative_shifts:
-        shift_start = shift - min(relative_shifts)
-        shift_end = shift_start - total_shift
-        if shift_end == 0:
-            shift_end = None
-        slices = []
-        for ax in range(rank):
-            if ax == axis:
-                slices.append(slice(shift_start, shift_end))
-            else:
-                if diminish_other_condition is None or diminish_other_condition(ax):
-                    slices.append(slice_others)
-                else:
-                    slices.append(slice(None))
-        sliced_tensor = tensor[(slice(None),) + tuple(slices) + (component_slice,)]
-        shifted_tensors.append(sliced_tensor)
-    return shifted_tensors
-
-
 def _multi_roll(tensor, roll_name, relative_shifts, diminish_others=(0, 0), names=None, base_selection={}):
     assert isinstance(tensor, AbstractTensor), tensor
     assert len(relative_shifts) >= 2

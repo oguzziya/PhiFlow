@@ -148,16 +148,16 @@ class AbstractTensor:
         raise AttributeError("%s has no attribute '%s'" % (self, name))
 
     def __add__(self, other):
-        return self._op2(other, lambda t1, t2: t1 + t2)
-
-    def __sub__(self, other):
-        return self._op2(other, lambda t1, t2: t1 - t2)
-
-    def __rsub__(self, other):
-        return self._op2(other, lambda t2, t1: t1 - t2)  # inverse order
+        return self._op2(other, lambda t1, t2: native_math.add(t1, t2))
 
     def __radd__(self, other):
-        return self._op2(other, lambda t2, t1: t1 + t2)  # inverse order
+        return self._op2(other, lambda t1, t2: native_math.add(t2, t1))
+
+    def __sub__(self, other):
+        return self._op2(other, lambda t1, t2: native_math.sub(t1, t2))
+
+    def __rsub__(self, other):
+        return self._op2(other, lambda t1, t2: native_math.sub(t2, t1))
 
     def __and__(self, other):
         return self._op2(other, lambda t1, t2: t1 & t2)
@@ -169,32 +169,38 @@ class AbstractTensor:
         return self._op2(other, lambda t1, t2: t1 ^ t2)
 
     def __mul__(self, other):
-        return self._op2(other, lambda t1, t2: t1 * t2)
+        return self._op2(other, lambda t1, t2: native_math.mul(t1, t2))
 
     def __rmul__(self, other):
-        return self._op2(other, lambda t2, t1: t1 * t2)  # inverse order
+        return self._op2(other, lambda t1, t2: native_math.mul(t2, t1))
 
     def __truediv__(self, other):
-        return self._op2(other, lambda t1, t2: t1 / t2)
+        return self._op2(other, lambda t1, t2: native_math.div(t1, t2))
 
     def __rtruediv__(self, other):
-        return self._op2(other, lambda t2, t1: t1 / t2)  # inverse order
+        return self._op2(other, lambda t1, t2: native_math.div(t2, t1))
 
     def __divmod__(self, other):
         return self._op2(other, lambda t1, t2: divmod(t1, t2))
 
     def __rdivmod__(self, other):
-        return self._op2(other, lambda t2, t1: divmod(t1, t2))  # inverse order
+        return self._op2(other, lambda t1, t2: divmod(t2, t1))
+
+    def __floordiv__(self, other):
+        return self._op2(other, lambda t1, t2: t1 // t2)
+
+    def __rfloordiv__(self, other):
+        return self._op2(other, lambda t1, t2: t2 // t1)
 
     def __pow__(self, power, modulo=None):
         assert modulo is None
-        return self._op2(power, lambda t1, t2: t1 ** t2)
+        return self._op2(power, lambda t1, t2: native_math.pow(t1, t2))
 
     def __rpow__(self, other):
-        return self._op2(other, lambda t2, t1: t1 ** t2)  # inverse order
+        return self._op2(other, lambda t1, t2: native_math.pow(t2, t1))
 
     def __mod__(self, other):
-        return self._op2(other, lambda t1, t2: t1 % t2)
+        return self._op2(other, lambda t1, t2: native_math.mod(t1, t2))
 
     def __lshift__(self, other):
         return self._op2(other, lambda t1, t2: t1 << t2)
@@ -203,7 +209,7 @@ class AbstractTensor:
         return self._op2(other, lambda t1, t2: t1 >> t2)
 
     def __eq__(self, other):
-        return self._op2(other, lambda t1, t2: t1 == t2)
+        return self._op2(other, lambda t1, t2: native_math.equal(t1, t2))
 
     def __ne__(self, other):
         return self._op2(other, lambda t1, t2: t1 != t2)
@@ -272,6 +278,8 @@ class AbstractTensor:
 
     def _op2(self, other, native_function):
         other = self._tensor(other)
+        if not isinstance(other, (NativeTensor, TensorStack, CollapsedTensor)):
+            return NotImplemented
         new_shape, (native1, native2) = broadcastable_native_tensors(self, other)
         result_tensor = native_function(native1, native2)
         return NativeTensor(result_tensor, new_shape)
@@ -347,7 +355,7 @@ class NativeTensor(AbstractTensor):
         assert isinstance(shape, Shape)
         assert len(native_math.staticshape(native_tensor)) == shape.rank
         self.tensor = native_tensor
-        self._shape = shape.with_linear_indices()
+        self._shape = shape
 
     def native(self, order=None):
         if order is None or tuple(order) == self.shape.names:
@@ -358,7 +366,7 @@ class NativeTensor(AbstractTensor):
         for name in order:
             if name not in self.shape:
                 tensor = native_math.expand_dims(tensor, axis=-1)
-                shape = shape.plus(1, name, CHANNEL_DIM, pos=-1, check_singleton=False)
+                shape = shape.plus(1, name, CHANNEL_DIM, pos=-1)
         # --- Transpose ---
         perm = shape.perm(order)
         tensor = native_math.transpose(tensor, perm)
@@ -395,13 +403,6 @@ class NativeTensor(AbstractTensor):
     def _op1(self, native_function):
         return NativeTensor(native_function(self.native()), self.shape)
 
-    def _op2(self, other, native_function):
-        other = self._tensor(other)
-        if self.shape == other.shape:
-            return NativeTensor(native_function(self.tensor, other.native()), self.shape)
-        else:
-            return AbstractTensor._op2(self, other, native_function)
-
 
 class CollapsedTensor(AbstractTensor):
     """
@@ -409,7 +410,6 @@ class CollapsedTensor(AbstractTensor):
     """
 
     def __init__(self, tensor: AbstractTensor, shape: Shape):
-        shape = shape.with_linear_indices()
         for name in tensor.shape.names:
             assert name in shape
         for size, name, dim_type in tensor.shape.dimensions:

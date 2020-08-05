@@ -1,8 +1,10 @@
+import numpy as np
 from phi import math
 from phi.geom import AABox
 from . import StaggeredGrid
 from ._field import Field
 from ._grid import CenteredGrid, Grid, _pad_value, _pad_mode, _gradient_extrapolation
+from ..math import tensor
 
 
 def laplace(field: Grid, axes=None):
@@ -35,7 +37,7 @@ def stagger(field: CenteredGrid, face_function=math.minimum):
 
 def divergence(field: StaggeredGrid):
     components = []
-    for i, dim in field.shape.spatial.indexed_names:
+    for i, dim in field.shape.spatial.enumerated_names:
         div_dim = math.gradient(field.data[i], dx=field.dx[i], difference='forward', padding=None, axes=[dim])[0]
         components.append(div_dim)
     data = math.sum(components, 0)
@@ -48,11 +50,16 @@ def mean(field: Grid):
 
 def pad(grid: Grid, widths):
     if isinstance(widths, int):
-        widths = [[widths, widths]] * grid.rank
+        widths = {axis: (widths, widths) for axis in grid.shape.spatial.names}
+    elif isinstance(widths, (tuple, list)):
+        widths = {axis: (width if isinstance(width, (tuple, list)) else (width, width)) for axis, width in zip(grid.shape.spatial.names, widths)}
+    else:
+        assert isinstance(widths, dict)
+    widths_list = [widths[axis] for axis in grid.shape.spatial.names]
     if isinstance(grid, CenteredGrid):
-        data = math.pad(self.data, [[0, 0]] + widths + [[0, 0]], _pad_mode(self.extrapolation), constant_values=_pad_value(self.extrapolation_value))
-        w_lower, w_upper = np.transpose(widths)
-        box = AABox(self.box.lower - w_lower * self.dx, self.box.upper + w_upper * self.dx)
+        data = math.pad(grid.data, widths, grid.extrapolation)
+        w_lower, w_upper = tensor(np.transpose(widths_list))
+        box = AABox(grid.box.lower - w_lower * grid.dx, grid.box.upper + w_upper * grid.dx)
         return CenteredGrid(data, box, grid.extrapolation)
 
 

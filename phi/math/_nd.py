@@ -12,7 +12,7 @@ from . import _tensor_math as math
 from ._shape import CHANNEL_DIM, spatial_shape, channel_shape
 from ._tensor_math import broadcast_op
 from ._tensors import tensor, AbstractTensor, TensorStack, NativeTensor
-from ._helper import _get_pad_width_axes, _get_pad_width, _dim_shifted, _contains_axis, _multi_roll
+from ._helper import _get_pad_width, _contains_axis, _multi_roll
 from ..backend import extrapolation
 
 

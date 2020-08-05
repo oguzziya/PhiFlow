@@ -14,7 +14,7 @@ CHANNEL_DIM = 2
 
 class Shape:
 
-    def __init__(self, sizes, names, types, indices=None, check_singleton=True):
+    def __init__(self, sizes, names, types):
         """
 
         :param sizes: list of dimension sizes
@@ -25,11 +25,6 @@ class Shape:
         self._sizes = np.array(sizes, dtype=np.object)
         self._names = np.array(names, dtype=np.object)
         self._types = np.array(types, dtype=np.int8)
-        indices = indices if indices is not None else range(len(sizes))
-        self._indices = np.array(indices, dtype=np.int8)
-        for i, (size, dim_type) in enumerate(zip(self._sizes, self._types)):
-            if isinstance(size, int) and size == 1 and dim_type != SPATIAL_DIM and check_singleton:
-                warnings.warn("Dimension '%s' at index %d of shape %s has size 1. Is this intentional? Singleton dimensions are not supported." % (names[i], i, sizes))
 
     @property
     def sizes(self):
@@ -44,27 +39,12 @@ class Shape:
         return tuple(self._types)
 
     @property
-    def indices(self):
-        return tuple(int(i) for i in self._indices)
-
-    def with_linear_indices(self):
-        return Shape(self._sizes, self._names, self._types)
-
-    @property
     def named_sizes(self):
         return {name: size for name, size in zip(self._names, self.sizes)}.items()
 
     @property
     def dimensions(self):
         return zip(self.sizes, self._names, self._types)
-
-    @property
-    def indexed_dimensions(self):
-        return zip(self.indices, self.sizes, self._names, self._types)
-
-    @property
-    def indexed_names(self):
-        return zip(self.indices, self._names)
 
     @property
     def enumerated_names(self):
@@ -83,7 +63,7 @@ class Shape:
             return tuple(self.index(n) for n in name)
         if isinstance(name, Shape):
             return tuple(self.index(n) for n in name._names)
-        for dim_name, idx in zip(self._names, self._indices):
+        for idx, dim_name in enumerate(self._names):
             if dim_name == name:
                 return idx
         raise ValueError("Shape %s does not contain dimension with name '%s'" % (self, name))
@@ -102,7 +82,7 @@ class Shape:
     def __getitem__(self, selection):
         if isinstance(selection, int):
             return self._sizes[selection]
-        return Shape(self._sizes[selection], self._names[selection], self._types[selection], indices=self._indices[selection])
+        return Shape(self._sizes[selection], self._names[selection], self._types[selection])
 
     def filtered(self, boolean_mask) -> Shape:
         return self[np.argwhere(boolean_mask)[:, 0]]
@@ -168,8 +148,7 @@ class Shape:
         sizes = self.batch.sizes + self.spatial.sizes + self.channel.sizes
         names = self.batch.names + self.spatial.names + self.channel.names
         types = self.batch.types + self.spatial.types + self.channel.types
-        indices = [self.index(name) for name in names]
-        return Shape(sizes, names, types, indices)
+        return Shape(sizes, names, types)
 
     def combined(self, other, allow_inconsistencies=False):
         """
@@ -240,7 +219,7 @@ class Shape:
     def __and__(self, other):
         return self.combined(other)
 
-    def plus(self, size, name, dim_type, pos=None, check_singleton=True):
+    def plus(self, size, name, dim_type, pos=None):
         """
         Add a dimension to the shape.
 
@@ -249,7 +228,7 @@ class Shape:
         if pos is None:
             same_type_dims = self.filtered(self._types == dim_type)
             if len(same_type_dims) > 0:
-                pos = same_type_dims._indices[0]
+                pos = self.index(same_type_dims.names[0])
             else:
                 pos = {BATCH_DIM: 0, SPATIAL_DIM: self.batch.rank+1, CHANNEL_DIM: self.rank + 1}[dim_type]
         elif pos < 0:
@@ -260,7 +239,7 @@ class Shape:
         sizes.insert(pos, size)
         names.insert(pos, name)
         types.insert(pos, dim_type)
-        return Shape(sizes, names, types, check_singleton=check_singleton)
+        return Shape(sizes, names, types)
 
     def without(self, other):
         if isinstance(other, (str, int)):
@@ -283,7 +262,7 @@ class Shape:
         return None not in self._sizes
 
     def with_sizes(self, sizes):
-        return Shape(sizes, self._names, self._types, self._indices)
+        return Shape(sizes, self._names, self._types)
 
     def with_size(self, name, size):
         new_sizes = list(self._sizes)
@@ -476,3 +455,9 @@ def channel_shape(sizes):
         return sizes.channel
     else:
         return infer_shape(sizes, batch_dims=0, spatial_dims=0)
+
+
+def check_singleton(shape):
+    for i, (size, dim_type) in enumerate(zip(shape.sizes, shape.types)):
+        if isinstance(size, int) and size == 1 and dim_type != SPATIAL_DIM and check_singleton:
+            warnings.warn("Dimension '%s' at index %d of shape %s has size 1. Is this intentional? Singleton dimensions are not supported." % (shape.names[i], i, shape.sizes))

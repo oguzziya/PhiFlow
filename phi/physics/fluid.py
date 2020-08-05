@@ -17,6 +17,7 @@ from .material import OPEN, Material
 from .physics import Physics, StateDependency
 from .pressuresolver.solver_api import poisson_solve
 from . import advect
+from ..math._helper import _multi_roll
 
 
 @struct.definition()
@@ -229,7 +230,7 @@ Projects the given velocity field by solving for and subtracting the pressure.
         active_mask = CenteredGrid.sample(1, velocity.resolution, velocity.box, math.extrapolation.ZERO)
     accessible_mask = CenteredGrid(active_mask.data, active_mask.box, Material.accessible_extrapolation_mode(domain.boundaries))
     # --- Boundary Conditions---
-    hard_bcs = _frictionless_velocity_mask(accessible_mask)
+    hard_bcs = field.stagger(accessible_mask, math.minimum)
     velocity *= hard_bcs
     for obstacle in obstacles:
         if not obstacle.is_stationary:
@@ -249,9 +250,18 @@ Projects the given velocity field by solving for and subtracting the pressure.
     return velocity if not return_info else (velocity, {'pressure': pressure, 'iterations': iterations, 'divergence': divergence_field})
 
 
-def _frictionless_velocity_mask(accessible: CenteredGrid):
-    return field.stagger(accessible, math.minimum)
-
-
 def laplace_pressure(pressure: CenteredGrid, active: CenteredGrid, accessible: CenteredGrid):
-    return field.laplace(pressure)  # TODO
+    extended_active_mask = field.pad(active, 1).data
+    extended_fluid_mask = field.pad(accessible, 1).data
+    extended_pressure = field.pad(pressure, 1).data
+    active_pressure = extended_active_mask * extended_pressure
+    by_dim = []
+    for dim in pressure.shape.spatial.names:
+        lower_active_pressure, upper_active_pressure = _multi_roll(active_pressure, dim, (-1, 1), diminish_others=(1, 1), names=pressure.shape.spatial.names)
+        lower_accessible, upper_accessible = _multi_roll(extended_fluid_mask, dim, (-1, 1), diminish_others=(1, 1), names=pressure.shape.spatial.names)
+        upper = upper_active_pressure * active.data
+        lower = lower_active_pressure * active.data
+        center = (- lower_accessible - upper_accessible) * pressure.data
+        by_dim.append(center + upper + lower)
+    data = math.sum(by_dim, axis=0)
+    return CenteredGrid(data, pressure.box, pressure.extrapolation.gradient())

@@ -6,6 +6,8 @@ from phi.math._tensors import tensor, TensorStack, CollapsedTensor
 
 import numpy as np
 
+from phi.math._track import as_sparse_linear_operation, SparseLinearOperation
+
 
 class TestTensors(TestCase):
 
@@ -70,23 +72,23 @@ class TestTensors(TestCase):
 
     def test_native_constant_ops(self):
         v = tensor(np.ones([1, 4, 3, 2]))
-        (v + 1).assert_close(2)
-        (v * 3.).assert_close(3)
-        (v / 2).assert_close(0.5)
-        (v ** 2).assert_close(1)
-        (2 ** v).assert_close(2)
-        (v + [0, 1]).assert_close([1, 2])
+        math.assert_close(v + 1, 2)
+        math.assert_close(v * 3, 3)
+        math.assert_close(v / 2, 0.5)
+        math.assert_close(v ** 2, 1)
+        math.assert_close(2 ** v, 2)
+        math.assert_close(v + [0, 1], [1, 2])
 
     def test_native_native_ops(self):
         v = tensor(np.ones([1, 4, 3, 2]))
         d = v.unstack()[0]
-        (v + d).assert_close(2, (d + v))
-        (v * d).assert_close(1)
+        math.assert_close(v + d, d + v, 2)
+        math.assert_close(v * d, d * v, 1)
 
     def test_math_functions(self):
         v = tensor(np.ones([1, 4, 3, 2]))
-        math.maximum(0, v).assert_close(1)
-        math.maximum(0, -v).assert_close(0)
+        math.assert_close(math.maximum(0, v), 1)
+        math.assert_close(math.maximum(0, -v), 0)
 
     def test_stacked_shapes(self):
         physics_config.x_last()
@@ -102,7 +104,7 @@ class TestTensors(TestCase):
         t0 = tensor(np.ones([10, 4, 3, 2]))
         tensors = t0.unstack()
         stacked = TensorStack(tensors, 0, CHANNEL_DIM)
-        stacked.assert_close(t0)
+        math.assert_close(stacked, t0)
         self.assertEqual((10, 4, 3, 2), stacked.native().shape)
         self.assertEqual((3, 4, 2, 10), stacked.native(order=('x', 'y', 0, 'batch')).shape)
         self.assertEqual((2, 10, 4, 3), stacked.native(order=(0, 'batch', 'y', 'x')).shape)  # this should re-stack since only the stacked dimension position is different
@@ -120,7 +122,7 @@ class TestTensors(TestCase):
     def test_collapsed(self):
         physics_config.x_first()
         scalar = zeros([1, 4, 3, 1])
-        scalar.assert_close(0)
+        math.assert_close(scalar, 0)
         self.assertEqual('(x=4, y=3)', repr(scalar.shape))
         self.assertEqual('(x=4)', repr(scalar.y[0].shape))
         self.assertEqual('()', repr(scalar.y[0].x[0].shape))
@@ -138,12 +140,26 @@ class TestTensors(TestCase):
     def test_shape_math(self):
         vector = tensor(np.ones([1, 4, 3, 2]))
         vector *= vector.shape
-        vector[0].assert_close(4)
-        vector[1].assert_close(3)
+        math.assert_close(vector[0], 4)
+        math.assert_close(vector[1], 3)
 
+    def test_linear_operator(self):
+        GLOBAL_AXIS_ORDER.x_last()
+        direct = math.random_normal([10, 4, 3, 1])
+        op = as_sparse_linear_operation(direct)
 
+        def linear_function(val):
+            val *= 2
+            sl = val.x[:3].y[:2]
+            val = math.pad(val, {'x': (2, 1), 'y': (1, 2)}, mode=math.extrapolation.ZERO)
+            val = val.x[1:4].y[:2]
+            return math.sum([val, sl], axis=0) - sl
 
-# print(abs(a4).native()[0,0,0,0])
-# print((-a4).native()[0,0,0,0])
-# print(reversed(a4).native()[0,0,0,0])
-
+        direct_result = linear_function(direct)
+        print()
+        print(direct_result.numpy()[0])
+        op_result = linear_function(op)
+        print()
+        print(op_result.numpy()[0])
+        math.assert_close(direct_result, op_result)
+        self.assertIsInstance(op_result, SparseLinearOperation)

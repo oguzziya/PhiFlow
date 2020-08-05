@@ -170,6 +170,14 @@ class SciPyBackend(Backend):
     def dot(self, a, b, axes):
         return np.tensordot(a, b, axes)
 
+    def mul(self, a, b):
+        if scipy.sparse.issparse(a):
+            return a.multiply(b)
+        elif scipy.sparse.issparse(b):
+            return b.multiply(a)
+        else:
+            return a * b
+
     def matmul(self, A, b):
         return np.stack([A.dot(b[i]) for i in range(b.shape[0])])
 
@@ -276,6 +284,9 @@ class SciPyBackend(Backend):
         return np.array(x).astype(dtype)
 
     def gather(self, values, indices):
+        if scipy.sparse.issparse(values):
+            if scipy.sparse.isspmatrix_coo(values):
+                values = values.tocsc()
         return values[indices]
 
     def gather_nd(self, values, indices, batch_dims=0):
@@ -374,7 +385,19 @@ class SciPyBackend(Backend):
         return array.dtype
 
     def sparse_tensor(self, indices, values, shape):
-        return scipy.sparse.csc_matrix((values, self.unstack(indices, -1)), shape=shape)
+        if not isinstance(indices, (tuple, list)):
+            indices = self.unstack(indices, -1)
+        if len(indices) == 2:
+            return scipy.sparse.csc_matrix((values, indices), shape=shape)
+        else:
+            raise NotImplementedError()
+
+    def coordinates(self, tensor, unstack_coordinates=False):
+        if scipy.sparse.issparse(tensor):
+            coo = tensor.tocoo()
+            return (coo.row, coo.col), coo.data
+        else:
+            raise NotImplementedError()
 
     def conjugate_gradient(self, A, y, x0, relative_tolerance: float = 1e-5, absolute_tolerance: float = 0.0, max_iterations: int = 1000, gradient: str = 'implicit', callback=None):
         bs_y = self.staticshape(y)[0]

@@ -1,12 +1,16 @@
+import warnings
 from functools import partial
 
 import numpy as np
 
 from ._shape import BATCH_DIM, CHANNEL_DIM, SPATIAL_DIM, Shape, EMPTY_SHAPE
+from ._track import as_sparse_linear_operation, SparseLinearOperation, pad_operator, sum_operators
 from ..backend import extrapolation, math
 from ._tensors import AbstractTensor, tensor, broadcastable_native_tensors, NativeTensor, CollapsedTensor, TensorStack, combined_shape
 from ._tensor_initializers import zeros
 from ..backend.scipy_backend import SCIPY_BACKEND
+
+any_ = any
 
 
 def is_tensor(x):
@@ -91,6 +95,8 @@ def pad(value, pad_width: dict, mode=extrapolation.ZERO):
                 new_sizes.append(size + delta)
         new_shape = value.shape.with_sizes(new_sizes)
         return CollapsedTensor(inner, new_shape)
+    elif isinstance(value, SparseLinearOperation):
+        return pad_operator(value, pad_width, mode)
     else:
         raise NotImplementedError()
 
@@ -190,7 +196,9 @@ def sum(value: AbstractTensor or list or tuple, axis=None):
         sums = [sum(t, inner_axes) for t in value.tensors]
         # --- outer sum ---
         if value.stack_dim_name in axes:
-            natives = [t.native() for t in sums]
+            if any_([isinstance(t, SparseLinearOperation) for t in sums]):
+                return sum_operators(sums)
+            natives = [t.native() for t in sums]  # TODO support sparse linear operations
             result = math.sum(natives, axis=0)
             return NativeTensor(result, sums[0].shape)
         else:
@@ -497,12 +505,23 @@ def conjugate_gradient(A, y, x0, relative_tolerance: float = 1e-5, absolute_tole
     x0_native = math.reshape(x0.native(), (x0.shape.batch.volume, x0.shape.non_batch.volume))
     y_native = math.reshape(y.native(), (y.shape.batch.volume, y.shape.non_batch.volume))
     if callable(A):
-        def A_(native_x):
-            x = math.reshape(native_x, x0.shape.non_batch.sizes)
-            x = NativeTensor(x, x0.shape.non_batch)
-            Ax = A(x)
-            Ax_native = math.reshape(Ax.native(), (y.shape.non_batch.volume,))
-            return Ax_native
+        x_track = as_sparse_linear_operation(x0)
+        A_ = None
+        try:
+            Ax_track = A(x_track)
+            if isinstance(Ax_track, SparseLinearOperation):
+                A_ = Ax_track.dependency_matrix
+        except NotImplementedError:
+            pass
+        if A_ is None:
+            warnings.warn("Could not create matrix for conjugate_gradient()")
+
+            def A_(native_x):
+                x = math.reshape(native_x, x0.shape.non_batch.sizes)
+                x = NativeTensor(x, x0.shape.non_batch)
+                Ax = A(x)
+                Ax_native = math.reshape(Ax.native(), (y.shape.non_batch.volume,))
+                return Ax_native
     else:
         A_ = math.reshape(A.native(), (y.shape.non_batch.volume, x0.shape.non_batch.volume))
 

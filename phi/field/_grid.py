@@ -26,7 +26,7 @@ class Grid(Field, ABC):
 
     @property
     def resolution(self) -> Shape:
-        return self.shape.spatial.with_linear_indices()
+        return self.shape.spatial
 
     @property
     def dx(self) -> AbstractTensor:
