@@ -31,7 +31,7 @@ class AbstractTensor:
         """
         raise NotImplementedError()
 
-    def numpy(self, order=None):
+    def numpy(self, order=None) -> np.ndarray:
         native = self.native(order=order)
         return native_math.numpy(native)
 
@@ -75,20 +75,25 @@ class AbstractTensor:
     def __repr__(self):
         try:
             content = self.numpy()
+            dtype = content.dtype
         except ValueError as e:
-            return "[%s  %s]" % (self.dtype, self.shape)
+            try:
+                dtype = self.dtype
+            except AttributeError:
+                return '[%s]' % (self.shape,)
+            return "[%s  %s]" % (dtype, self.shape)
         if self.rank == 0:
             return str(content)
         if self.shape.volume <= 4:
-            content = list(native_math.reshape(content, [-1]))
+            content = list(np.reshape(content, [-1]))
             content = ', '.join([repr(number) for number in content])
             if self.rank == 1:
-                return "[%s  %s]" % (self.dtype, content)
+                return "[%s  %s]" % (content.dtype, content)
             else:
-                return "[%s, %s:  %s]" % (self.dtype, self.shape, content)
+                return "[%s, %s:  %s]" % (content.dtype, self.shape, content)
         else:
             min_, max_ = np.min(content), np.max(content)
-            return "[%s, %s  %s < ... < %s]" % (self.dtype, self.shape, min_, max_)
+            return "[%s, %s  %s < ... < %s]" % (content.dtype, self.shape, min_, max_)
 
     def __str__(self):
         return self.__repr__()
@@ -145,7 +150,7 @@ class AbstractTensor:
     def __getattr__(self, name):
         if name in self.shape:
             return _TensorDim(self, name)
-        raise AttributeError("%s has no attribute '%s'" % (self, name))
+        raise AttributeError("%s with shape %s has no attribute '%s'" % (self.__class__, self.shape, name))
 
     def __add__(self, other):
         return self._op2(other, lambda t1, t2: native_math.add(t1, t2))
@@ -251,6 +256,10 @@ class AbstractTensor:
         assert self.shape.channel.rank == 1
         return self[::-1]
 
+    def __iter__(self):
+        assert self.rank == 1
+        return iter(self.native())
+
     def _tensor(self, other):
         if isinstance(other, AbstractTensor):
             return other
@@ -353,7 +362,7 @@ class NativeTensor(AbstractTensor):
     def __init__(self, native_tensor, shape):
         assert not isinstance(native_tensor, AbstractTensor)
         assert isinstance(shape, Shape)
-        assert len(native_math.staticshape(native_tensor)) == shape.rank
+        assert native_math.staticshape(native_tensor) == shape.sizes
         self.tensor = native_tensor
         self._shape = shape
 

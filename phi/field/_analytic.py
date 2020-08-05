@@ -37,7 +37,7 @@ class SymbolicFieldBackend(Backend):
         Backend.__init__(self, 'Symbolic Field Backend')
         self.backend = backend
         for fname in dir(self):
-            if fname not in ('__init__', 'is_tensor', 'is_applicable', 'symbolic_call') and not fname.startswith('__'):
+            if fname not in ('__init__', 'is_tensor', 'symbolic_call', 'complex_type', 'float_type') and not fname.startswith('__'):
                 function = getattr(self, fname)
                 if callable(function):
                     def context(fname=fname):

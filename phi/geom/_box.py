@@ -6,7 +6,7 @@ from ._geom import Geometry
 from ._transform import rotate
 from ..math import tensor, combined_shape, spatial_shape
 from ..math._shape import CHANNEL_DIM
-from ..math._tensors import NativeTensor, TensorStack
+from ..math._tensors import NativeTensor, TensorStack, AbstractTensor
 
 
 class AbstractBox(Geometry):
@@ -23,19 +23,19 @@ class AbstractBox(Geometry):
         raise NotImplementedError()
 
     @property
-    def size(self):
+    def size(self) -> AbstractTensor:
         raise NotImplementedError(self)
 
     @property
-    def half_size(self):
+    def half_size(self) -> AbstractTensor:
         raise NotImplementedError(self)
 
     @property
-    def lower(self):
+    def lower(self) -> AbstractTensor:
         raise NotImplementedError(self)
 
     @property
-    def upper(self):
+    def upper(self) -> AbstractTensor:
         raise NotImplementedError(self)
 
     def bounding_radius(self):
@@ -119,7 +119,7 @@ class AABox(AbstractBox):
     def upper(self):
         return self._upper
 
-    @struct.derived()
+    @property
     def size(self):
         return self.upper - self.lower
 
@@ -144,7 +144,10 @@ class AABox(AbstractBox):
         return AABox(self.lower + delta, self.upper + delta)
 
     def __repr__(self):
-        return '%s at (%s)' % ('x'.join([str(x) for x in self.size]), ','.join([str(x) for x in self.lower]))
+        if self.shape.non_channel.volume == 1:
+            return 'box[%s at %s]' % ('x'.join([str(x) for x in self.size.numpy().flatten()]), ','.join([str(x) for x in self.lower.numpy().flatten()]))
+        else:
+            return 'box[shape=%s]' % self._shape
 
     @staticmethod
     def to_box(value, resolution_hint=None):

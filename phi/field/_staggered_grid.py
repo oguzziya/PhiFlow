@@ -104,7 +104,7 @@ class StaggeredGrid(Grid):
     def unstack(self, dimension=0):
         if dimension == 0:
             result = []
-            for dim, data in zip(self.resolution.spatial.names, self._data):
+            for dim, data in zip(self.resolution.spatial.names, self._data.unstack()):
                 result.append(CenteredGrid(data, extend_symmetric(self.resolution, self.box, dim)[1], self.extrapolation))
             return tuple(result)
         else:
@@ -128,7 +128,7 @@ class StaggeredGrid(Grid):
         return GeometryStack(grids, 'staggered')
 
     def __repr__(self):
-        return 'StaggeredGrid[%s, size=%s]' % (self.shape, self.box.size)
+        return 'StaggeredGrid[%s, size=%s]' % (self.shape, self.box.size.numpy())
 
     def compatible(self, other_field):
         if not other_field.has_points:

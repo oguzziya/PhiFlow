@@ -14,6 +14,7 @@ class DynamicBackend(Backend):
 
     def __init__(self):
         self.backends = []
+        self.default_backend = None
         Backend.__init__(self, 'Dynamic')
 
     @property
@@ -29,10 +30,28 @@ class DynamicBackend(Backend):
     def choose_backend(self, values: list) -> Backend:
         if not isinstance(values, (list, tuple)):
             values = [values]
-        for backend in self.backends:
-            if backend.is_applicable(values):
-                return backend
-        raise NoBackendFound('No backend found for values %s; registered backends are %s' % (values, self.backends))
+
+        def applicable(backend):
+            for value in values:
+                if not backend.is_tensor(value, only_native=False):
+                    return False
+            return True
+
+        # --- Default Backend has priority ---
+        if self.default_backend is not None and applicable(self.default_backend):
+            return self.default_backend
+        # --- Filter out non-applicable ---
+        backends = list(backend for backend in self.backends if applicable(backend))
+        if len(backends) == 0:
+            list(backend for backend in self.backends if applicable(backend))
+            raise NoBackendFound('No backend found for values %s; registered backends are %s' % (values, self.backends))
+        # --- Native tensors? ---
+        for backend in backends:
+            for value in values:
+                if backend.is_tensor(value, only_native=True):
+                    return backend
+        else:
+            return backends[0]
 
     def add_backend(self, backend, priority=None):
         for existing in self.backends:
@@ -44,14 +63,6 @@ class DynamicBackend(Backend):
         else:
             self.backends.insert(0, backend)
         return True
-
-    def is_applicable(self, values):
-        if not isinstance(values, tuple) and not isinstance(values, list):
-            values = [values]
-        for backend in self.backends:
-            if backend.is_applicable(values):
-                return True
-        return False
 
     def is_tensor(self, x, only_native=False):
         try:

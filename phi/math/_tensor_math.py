@@ -1,3 +1,4 @@
+import numbers
 import warnings
 from functools import partial
 
@@ -11,6 +12,7 @@ from ._tensor_initializers import zeros
 from phi.math.backend.scipy_backend import SCIPY_BACKEND
 
 any_ = any
+all_ = all
 
 
 def is_tensor(x):
@@ -164,7 +166,7 @@ def reshape(value, shape):
 
 
 def prod(value, axis=None):
-    if SCIPY_BACKEND.is_applicable([value]) and axis is None:
+    if axis is None and isinstance(value, (tuple, list)) and all_(isinstance(v, numbers.Number) for v in value):
         return SCIPY_BACKEND.prod(value)
     raise NotImplementedError()
 

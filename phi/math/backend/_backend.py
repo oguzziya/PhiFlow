@@ -1,3 +1,5 @@
+import numpy as np
+
 from . import _extrapolation as extrapolation
 
 
@@ -33,6 +35,42 @@ class Backend:
         self._precision = precision
 
     @property
+    def float_type(self):
+        return {16: np.float16, 32: np.float32, 64: np.float64, None: np.float32}[self.precision]
+
+    @property
+    def complex_type(self):
+        return {16: np.complex64, 32: np.complex64, 64: np.complex128, None: np.complex64}[self.precision]
+
+    def combine_types(self, *dtypes):
+        # all bool?
+        if all(dt.kind == 'b' for dt in dtypes):
+            return dtypes[0]
+        # all int / bool?
+        if all(dt.kind == 'i' or dt.kind == 'b' for dt in dtypes):
+            largest = max(dtypes, key=lambda dt: dt.itemsize)
+            return largest
+        # all real?
+        if all(dt.kind == 'f' or dt.kind == 'i' or dt.kind == 'b' for dt in dtypes):
+            return self.float_type
+        # complex
+        if all(dt.kind == 'c' or dt.kind == 'f' or dt.kind == 'i' or dt.kind == 'b' for dt in dtypes):
+            return self.complex_type
+        raise ValueError(dtypes)
+
+    def auto_cast(self, *tensors):
+        """
+        Determins the appropriate data type resulting from operations involving the tensors as input.
+
+        This method is called by the default implementations of basic operators.
+        Backends can override this method to prevent unnecessary casting.
+        """
+        dtypes = [self.dtype(t) for t in tensors]
+        result_type = self.combine_types(*dtypes)
+        tensors = [self.cast(t, result_type) for t in tensors]
+        return tensors
+
+    @property
     def has_fixed_precision(self):
         return self.precision is not None
 
@@ -44,12 +82,6 @@ class Backend:
 
     def matches_name(self, name):
         return self.name.lower() == name.lower()
-
-    def is_applicable(self, values):
-        for value in values:
-            if self.is_tensor(value, only_native=True):
-                return True
-        return False
 
     # --- Abstract math functions ---
 
@@ -109,16 +141,6 @@ class Backend:
         :param value: tensor
         :param pad_width: 2D tensor specifying the number of values padded to the edges of each axis in the form [[before axis 0, after axis 0], ...] including batch and component axes.
         :param mode: extrapolation
-        """
-        raise NotImplementedError(self)
-
-    def resample(self, inputs, sample_coords, interpolation='linear', boundary=extrapolation.ZERO):
-        """
-        Interpolates a regular grid at the specified coordinates.
-        :param inputs: grid data
-        :param sample_coords: tensor of floating grid indices. The last dimension must match the dimensions of inputs. The first grid point of dimension i lies at position 0, the last at data.shape[i]-1.
-        :param interpolation: only 'linear' is currently supported
-        :param boundary: extrapolation
         """
         raise NotImplementedError(self)
 
@@ -367,6 +389,18 @@ If `multiples` has more dimensions than `value`, these dimensions are added to `
 
     # --- Math function with default implementation ---
 
+    def resample(self, inputs, sample_coords, interpolation='linear', boundary=extrapolation.ZERO):
+        """
+        Interpolates a regular grid at the specified coordinates.
+        :param inputs: grid data
+        :param sample_coords: tensor of floating grid indices. The last dimension must match the dimensions of inputs. The first grid point of dimension i lies at position 0, the last at data.shape[i]-1.
+        :param interpolation: only 'linear' is currently supported
+        :param boundary: extrapolation
+        """
+        from phi.math.backend import general_grid_sample_nd
+        assert interpolation == 'linear'
+        return general_grid_sample_nd(inputs, sample_coords, boundary, self)
+
     def ndims(self, tensor):
         return len(self.staticshape(tensor))
 
@@ -393,20 +427,25 @@ If `multiples` has more dimensions than `value`, these dimensions are added to `
         return tuple(result)
 
     def add(self, a, b):
-        return self.as_tensor(a, convert_external=False) + self.as_tensor(b, convert_external=False)
+        a, b = self.auto_cast(a, b)
+        return a + b
 
     def sub(self, a, b):
-        return self.as_tensor(a, convert_external=False) - self.as_tensor(b, convert_external=False)
+        a, b = self.auto_cast(a, b)
+        return a - b
 
     def mul(self, a, b):
-        return self.as_tensor(a, convert_external=False) * self.as_tensor(b, convert_external=False)
+        a, b = self.auto_cast(a, b)
+        return a * b
 
     def div(self, numerator, denominator):
-        return self.as_tensor(numerator, convert_external=False) / self.as_tensor(denominator, convert_external=False)
+        numerator, denominator = self.auto_cast(numerator, denominator)
+        return numerator / denominator
 
     def pow(self, base, exp):
-        return self.as_tensor(base, convert_external=False) ** self.as_tensor(exp, convert_external=False)
+        base, exp = self.auto_cast(base, exp)
+        return base ** exp
 
     def mod(self, dividend, divisor):
-        dividend_tensor = self.as_tensor(dividend, convert_external=False)
-        return dividend_tensor % self.cast(self.as_tensor(divisor, convert_external=False), self.dtype(dividend_tensor))
+        dividend, divisor = self.auto_cast(dividend, divisor)
+        return dividend % divisor

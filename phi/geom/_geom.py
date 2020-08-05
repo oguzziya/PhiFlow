@@ -1,4 +1,4 @@
-import warnings
+from __future__ import annotations
 
 from phi import math
 from phi.math import AbstractTensor
@@ -22,17 +22,7 @@ class Geometry:
     def rank(self):
         return self.shape.spatial.rank
 
-    def value_at(self, location):
-        """
-        Samples the geometry at the given locations and returns a binary mask, labelling the points as inside=1, outside=0.
-
-        :param location: tensor of shape (batch_size, ..., rank)
-        :return: float tensor of shape (*location.shape[:-1], 1).
-        """
-        warnings.warn("Geometry.value_at() is deprecated. Use lies_inside or approximate_fraction_inside instead.", DeprecationWarning)
-        return math.to_float(self.lies_inside(location))
-
-    def lies_inside(self, location):
+    def lies_inside(self, location) -> AbstractTensor:
         """
         Tests whether the given location lies inside or outside of the geometry. Locations on the surface count as inside.
 
@@ -41,7 +31,7 @@ class Geometry:
         """
         raise NotImplementedError(self.__class__)
 
-    def approximate_signed_distance(self, location):
+    def approximate_signed_distance(self, location) -> AbstractTensor:
         """
         Computes the approximate distance from location to the surface of the geometry.
         Locations outside return positive values, inside negative values and zero exactly at the boundary.
@@ -55,7 +45,7 @@ class Geometry:
         """
         raise NotImplementedError(self.__class__)
 
-    def approximate_fraction_inside(self, other_geometry):
+    def approximate_fraction_inside(self, other_geometry) -> AbstractTensor:
         """
         Computes the approximate overlap between the geometry and a small other geometry.
         Returns 1.0 if `other_geometry` is fully enclosed in this geometry and 0.0 if there is no overlap.
@@ -80,7 +70,7 @@ class Geometry:
         inside_fraction = math.clip(inside_fraction, 0, 1)
         return inside_fraction
 
-    def bounding_radius(self):
+    def bounding_radius(self) -> AbstractTensor:
         """
         Returns the radius of a Sphere object that fully encloses this geometry.
         The sphere is centered at the center of this geometry.
@@ -89,7 +79,7 @@ class Geometry:
         """
         raise NotImplementedError(self.__class__)
 
-    def bounding_half_extent(self):
+    def bounding_half_extent(self) -> AbstractTensor:
         """
         The bounding half-extent sets a limit on the outer-most point for each coordinate axis.
         Each component is non-negative.
@@ -101,7 +91,7 @@ class Geometry:
         """
         raise NotImplementedError(self.__class__)
 
-    def shifted(self, delta):
+    def shifted(self, delta) -> Geometry:
         """
         Returns a translated version of this geometry.
         :param delta: direction vector
@@ -110,7 +100,7 @@ class Geometry:
         """
         raise NotImplementedError(self.__class__)
 
-    def rotated(self, angle):
+    def rotated(self, angle) -> Geometry:
         """
         Returns a rotated version of this geometry.
         The geometry is rotated about its center point.

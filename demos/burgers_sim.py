@@ -15,6 +15,7 @@ def step():
 
 
 step()
+step()
 velocity.at_centers()
 
 app = App('Burgers Equation in %dD' % len(domain.resolution), framerate=5)

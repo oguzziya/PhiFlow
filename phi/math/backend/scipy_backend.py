@@ -24,27 +24,6 @@ class SciPyBackend(Backend):
     def precision_dtype(self):
         return {16: np.float16, 32: np.float32, 64: np.float64, None: np.float32}[self.precision]
 
-    def is_applicable(self, values):
-        if values is None:
-            return True
-        if isinstance(values, np.ndarray):
-            return True
-        if isinstance(values, numbers.Number):
-            return True
-        if isinstance(values, (bool, np.bool_)):
-            return True
-        if scipy.sparse.issparse(values):
-            return True
-        if isinstance(values, collections.Iterable):
-            try:
-                for value in values:
-                    if not self.is_applicable(value):
-                        return False
-                return True
-            except:
-                return False
-        return False
-
     # --- Abstract math functions ---
 
     def as_tensor(self, x, convert_external=True):
@@ -59,12 +38,14 @@ class SciPyBackend(Backend):
         return array
 
     def is_tensor(self, x, only_native=False):
-        if not only_native and isinstance(x, numbers.Number):
-            return True
-        if isinstance(x, np.ndarray):
-            return x.dtype != np.object
+        is_array = isinstance(x, np.ndarray) and x.dtype != np.object
+        is_np_scalar = isinstance(x, np.bool_)
+        is_sparse = scipy.sparse.issparse(x)
+        is_python = isinstance(x, (numbers.Number, bool))
+        if only_native:
+            return is_array or is_sparse or is_np_scalar
         else:
-            return False
+            return is_array or is_python or is_sparse or is_np_scalar
 
     def numpy(self, tensor):
         if isinstance(tensor, np.ndarray):
@@ -153,10 +134,6 @@ class SciPyBackend(Backend):
         assert result.dtype == Tout, "returned value has wrong type: {}, expected {}".format(result.dtype, Tout)
         assert result.shape == shape_out, "returned value has wrong shape: {}, expected {}".format(result.shape, shape_out)
         return result
-
-    def resample(self, inputs, sample_coords, interpolation='linear', boundary=extrapolation.ZERO):
-        assert interpolation == 'linear'
-        return general_grid_sample_nd(inputs, sample_coords, boundary, self)
 
     def zeros_like(self, tensor):
         return np.zeros_like(tensor)
@@ -284,7 +261,13 @@ class SciPyBackend(Backend):
             return x.astype(np.complex64)
 
     def cast(self, x, dtype):
-        return np.array(x).astype(dtype)
+        if self.is_tensor(x, only_native=True) and x.dtype == dtype:
+            return x
+        else:
+            return np.array(x, dtype)
+
+    def auto_cast(self, *tensors):
+        return tensors
 
     def gather(self, values, indices):
         if scipy.sparse.issparse(values):

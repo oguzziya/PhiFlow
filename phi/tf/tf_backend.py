@@ -15,14 +15,11 @@ class TFBackend(Backend):
     def __init__(self):
         Backend.__init__(self, "TensorFlow")
 
-    @property
-    def precision_dtype(self):
-        return {16: np.float16, 32: np.float32, 64: np.float64, None: np.float32}[self.precision]
-
     def is_tensor(self, x, only_native=False):
-        if not only_native and SCIPY_BACKEND.is_tensor(x, only_native=False):
-            return True
-        return isinstance(x, (tf.Tensor, tf.Variable, tf.SparseTensor, tf.Operation))
+        if only_native:
+            return tf.is_tensor(x)
+        else:
+            return tf.is_tensor(x) or SCIPY_BACKEND.is_tensor(x, only_native=False)
 
     def as_tensor(self, x, convert_external=True):
         if self.is_tensor(x, only_native=convert_external):
@@ -40,7 +37,9 @@ class TFBackend(Backend):
         return tensor
 
     def numpy(self, tensor):
-        return tensor.numpy()
+        if tf.is_tensor(tensor):
+            return tensor.numpy()
+        return SCIPY_BACKEND.numpy(tensor)
 
     def copy(self, tensor, only_mutable=False):
         if not only_mutable or tf.executing_eagerly():
@@ -58,10 +57,10 @@ class TFBackend(Backend):
         return tf.div_no_nan(x, y)
 
     def random_uniform(self, shape):
-        return tf.random.uniform(shape, dtype=self.precision_dtype)
+        return tf.random.uniform(shape, dtype=self.float_type)
 
     def random_normal(self, shape):
-        return tf.random.normal(shape, dtype=self.precision_dtype)
+        return tf.random.normal(shape, dtype=self.float_type)
 
     def rank(self, value):
         return len(value.shape)
@@ -86,16 +85,21 @@ class TFBackend(Backend):
             value = self._single_mode_single_constant_pad(value, *pad_pass)
         return value
 
-    def _single_mode_single_constant_pad(self, value, pad_width, single_mode, constant_value=0):
-        assert single_mode in ('constant', 'symmetric', 'circular', 'reflect', 'replicate'), single_mode
-        if single_mode == 'circular':
+    def _single_mode_single_constant_pad(self, value, pad_width, single_mode):
+        if isinstance(single_mode, extrapolation.ConstantExtrapolation):
+            constant_value = single_mode.value
+            return tf.pad(value, pad_width, 'CONSTANT', constant_values=constant_value)
+        if single_mode == extrapolation.SYMMETRIC:
+            return tf.pad(value, pad_width, 'SYMMETRIC')
+        if single_mode == extrapolation.REFLECT:
+            return tf.pad(value, pad_width, 'REFLECT')
+        if single_mode == extrapolation.PERIODIC:
             return circular_pad(value, pad_width, self)
-        if single_mode == 'replicate':
+        if single_mode == extrapolation.BOUNDARY:
             if np.any(np.array(pad_width) > 1):
                 return replicate_pad(value, pad_width, self)
             else:
-                single_mode = 'symmetric'
-        return tf.pad(value, pad_width, single_mode.upper(), constant_values=constant_value)  # constant, symmetric, reflect
+                return tf.pad(value, pad_width, 'SYMMETRIC')
 
     def reshape(self, value, shape):
         return tf.reshape(value, shape)
@@ -140,18 +144,22 @@ class TFBackend(Backend):
             result.set_shape(shape_out)
         return result
 
-    def resample(self, inputs, sample_coords, interpolation='linear', boundary='constant', constant_values=0):
+    def resample(self, inputs, sample_coords, interpolation='linear', boundary=extrapolation.ZERO):
         assert interpolation == 'linear'
         if use_cuda(inputs):
             return resample_cuda(inputs, sample_coords, boundary)
         else:
-            return general_grid_sample_nd(inputs, sample_coords, boundary, constant_values, self)  # while this is a bit slower than niftynet, it give consisten results at the boundaries
+            return Backend.resample(self, inputs, sample_coords, interpolation, boundary)
 
     def zeros_like(self, tensor):
         return tf.zeros_like(tensor)
 
     def ones_like(self, tensor):
         return tf.ones_like(tensor)
+
+    def meshgrid(self, *coordinates):
+        result = tf.meshgrid(*coordinates, indexing='ij')
+        return result
 
     def dot(self, a, b, axes):
         return tf.tensordot(a, b, axes)
@@ -188,7 +196,7 @@ class TFBackend(Backend):
         return tf.round(x)
 
     def ceil(self, x):
-        return tf.ceil(x)
+        return tf.math.ceil(x)
 
     def floor(self, x):
         return tf.floor(x)
@@ -219,12 +227,15 @@ class TFBackend(Backend):
             return outputs
 
     def maximum(self, a, b):
+        a, b = self.auto_cast(a, b)
         return tf.maximum(a, b)
 
     def minimum(self, a, b):
+        a, b = self.auto_cast(a, b)
         return tf.minimum(a, b)
 
     def clip(self, x, minimum, maximum):
+        x, minimum, maximum = self.auto_cast(x, minimum, maximum)
         return tf.clip_by_value(x, minimum, maximum)
 
     def sqrt(self, x):
@@ -261,7 +272,7 @@ class TFBackend(Backend):
             warnings.warn('float64 argument is deprecated, set Backend.precision = 64 to use 64 bit operations.', DeprecationWarning)
             return tf.cast(x, tf.float64)
         else:
-            return tf.cast(x, self.precision_dtype)
+            return tf.cast(x, self.float_type)
 
     def staticshape(self, tensor):
         if self.is_tensor(tensor, only_native=True):
@@ -391,7 +402,14 @@ class TFBackend(Backend):
         return tf.cos(x)
 
     def dtype(self, array):
-        return array.dtype.as_numpy_dtype
+        if tf.is_tensor(array):
+            dt = array.dtype.as_numpy_dtype
+            if dt is bool:
+                return np.dtype('b')
+            else:
+                return np.dtype(dt(0))
+        else:
+            return SCIPY_BACKEND.dtype(array)
 
     def sparse_tensor(self, indices, values, shape):
         return tf.SparseTensor(indices=indices, values=values, dense_shape=shape)
