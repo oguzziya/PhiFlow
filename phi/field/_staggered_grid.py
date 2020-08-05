@@ -190,7 +190,7 @@ def stack_staggered_components(tensors):
 
 
 def extend_symmetric(resolution: Shape, box: AbstractBox, axis, cells=1):
-    axis_mask = resolution.mask(axis) * cells
+    axis_mask = np.array(resolution.mask(axis)) * cells
     unit = box.size / resolution * axis_mask
     delta_size = unit / 2
     box = AABox(box.lower - delta_size, box.upper + delta_size)

@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import warnings
 
-import numpy as np
-
 from phi import math
 
 
@@ -105,20 +103,20 @@ class Shape:
 
     @property
     def non_singleton(self):
-        return self.filtered(self.sizes != 1)
+        return self.filtered([size != 1 for size in self.sizes])
 
     def mask(self, names):
         if isinstance(names, (str, int)):
             names = [names]
         mask = [1 if name in names else 0 for name in self.names]
-        return np.array(mask)
+        return tuple(mask)
 
     def select(self, *names):
         indices = [self.index(name) for name in names]
         return self[indices]
 
     def __repr__(self):
-        strings = ['%s=%s' % (name, size) if isinstance(name, str) else '%d' % size for size, name, type in self.dimensions]
+        strings = ['%s=%s' % (name, size) if isinstance(name, str) else '%d' % size for size, name, _ in self.dimensions]
         return '(' + ', '.join(strings) + ')'
 
     def __str__(self):
@@ -233,10 +231,10 @@ class Shape:
         if isinstance(other, (str, int)):
             return self[[i for i in range(self.rank) if self.names[i] != other]]
         if isinstance(other, (tuple, list)):
-            return self[np.argwhere([name not in other for name in self.names])[:, 0]]
+            return self[[i for i in range(self.rank) if self.names[i] not in other]]
         elif isinstance(other, Shape):
-            return self[np.argwhere([name not in other.names for name in self.names])[:, 0]]
-        elif other is None:
+            return self[[i for i in range(self.rank) if self.names[i] not in other.names]]
+        elif other is None:  # subtract all
             return EMPTY_SHAPE
         else:
             raise ValueError(other)
