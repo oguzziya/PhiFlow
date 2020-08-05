@@ -262,7 +262,7 @@ setup(
     author_email='philipp.holl@tum.de',
     url='https://github.com/tum-pbs/PhiFlow',
     include_package_data=True,
-    install_requires=['scipy'],
+    install_requires=['scipy', 'dash', 'plotly', 'imageio', 'matplotlib'],
     classifiers=[
         'Development Status :: 5 - Production/Stable',
         'Intended Audience :: Developers',
@@ -273,12 +273,4 @@ setup(
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
     ],
-    extras_require={
-        'gui': ['dash',
-                'dash-renderer',
-                'dash-html-components',
-                'dash-core-components',
-                'plotly',
-                'imageio'],
-    }
 )
