@@ -21,34 +21,21 @@ class Shape:
         :param names: list of dimension names, either strings (spatial, batch) or integers (channel)
         :param types: list of types, all values must be one of (CHANNEL_DIM, SPATIAL_DIM, BATCH_DIM)
         """
-        assert len(sizes) == len(names) == len(types) == len(set(names))  # no duplicates
-        self._sizes = np.array(sizes, dtype=np.object)
-        self._names = np.array(names, dtype=np.object)
-        self._types = np.array(types, dtype=np.int8)
-
-    @property
-    def sizes(self):
-        return tuple(self._sizes)
-
-    @property
-    def names(self):
-        return tuple(self._names)
-
-    @property
-    def types(self):
-        return tuple(self._types)
+        self.sizes = tuple(sizes)
+        self.names = tuple(names)
+        self.types = tuple(types)
 
     @property
     def named_sizes(self):
-        return {name: size for name, size in zip(self._names, self.sizes)}.items()
+        return {name: size for name, size in zip(self.names, self.sizes)}.items()
 
     @property
     def dimensions(self):
-        return zip(self.sizes, self._names, self._types)
+        return zip(self.sizes, self.names, self.types)
 
     @property
     def enumerated_names(self):
-        return zip(range(len(self)), self._names)
+        return zip(range(len(self)), self.names)
 
     def __len__(self):
         return len(self.sizes)
@@ -62,67 +49,68 @@ class Shape:
         if isinstance(name, (list, tuple)):
             return tuple(self.index(n) for n in name)
         if isinstance(name, Shape):
-            return tuple(self.index(n) for n in name._names)
-        for idx, dim_name in enumerate(self._names):
+            return tuple(self.index(n) for n in name.names)
+        for idx, dim_name in enumerate(self.names):
             if dim_name == name:
                 return idx
         raise ValueError("Shape %s does not contain dimension with name '%s'" % (self, name))
 
     def get_size(self, name):
         if isinstance(name, (str, int)):
-            return self._sizes[self.names.index(name)]
+            return self.sizes[self.names.index(name)]
         elif isinstance(name, (tuple, list)):
             return tuple(self.get_size(n) for n in name)
         else:
             raise ValueError(name)
 
     def get_type(self, name):
-        return self._types[self.names.index(name)]
+        return self.types[self.names.index(name)]
 
     def __getitem__(self, selection):
         if isinstance(selection, int):
-            return self._sizes[selection]
-        return Shape(self._sizes[selection], self._names[selection], self._types[selection])
+            return self.sizes[selection]
+        return Shape([self.sizes[i] for i in selection], [self.names[i] for i in selection], [self.types[i] for i in selection])
 
     def filtered(self, boolean_mask) -> Shape:
-        return self[np.argwhere(boolean_mask)[:, 0]]
+        indices = [i for i in range(self.rank) if boolean_mask[i]]
+        return self[indices]
 
     @property
     def channel(self):
-        return self.filtered(self._types == CHANNEL_DIM)
+        return self.filtered([t == CHANNEL_DIM for t in self.types])
 
     @property
     def spatial(self) -> Shape:
-        return self.filtered(self._types == SPATIAL_DIM)
+        return self.filtered([t == SPATIAL_DIM for t in self.types])
 
     @property
     def batch(self):
-        return self.filtered(self._types == BATCH_DIM)
+        return self.filtered([t == BATCH_DIM for t in self.types])
 
     @property
     def non_channel(self):
-        return self.filtered(self._types != CHANNEL_DIM)
+        return self.filtered([t != CHANNEL_DIM for t in self.types])
 
     @property
     def non_spatial(self):
-        return self.filtered(self._types != SPATIAL_DIM)
+        return self.filtered([t != SPATIAL_DIM for t in self.types])
 
     @property
     def non_batch(self):
-        return self.filtered(self._types != BATCH_DIM)
+        return self.filtered([t != BATCH_DIM for t in self.types])
 
     @property
     def singleton(self):
-        return self.filtered(self._sizes == 1)
+        return self.filtered([size == 1 for size in self.sizes])
 
     @property
     def non_singleton(self):
-        return self.filtered(self._sizes != 1)
+        return self.filtered(self.sizes != 1)
 
     def mask(self, names):
         if isinstance(names, (str, int)):
             names = [names]
-        mask = [1 if name in names else 0 for name in self._names]
+        mask = [1 if name in names else 0 for name in self.names]
         return np.array(mask)
 
     def select(self, *names):
@@ -159,9 +147,9 @@ class Shape:
         :raise: ValueError if shapes don't match
         """
         assert isinstance(other, Shape)
-        sizes = list(self.batch._sizes)
-        names = list(self.batch._names)
-        types = list(self.batch._types)
+        sizes = list(self.batch.sizes)
+        names = list(self.batch.names)
+        types = list(self.batch.types)
 
         def _check(size, name):
             self_size = self.get_size(name)
@@ -181,17 +169,17 @@ class Shape:
         # --- spatial ---
         # spatial dimensions must match exactly or one shape has none
         if self.spatial.rank == 0:
-            sizes.extend(other.spatial._sizes)
-            names.extend(other.spatial._names)
-            types.extend(other.spatial._types)
+            sizes.extend(other.spatial.sizes)
+            names.extend(other.spatial.names)
+            types.extend(other.spatial.types)
         elif other.spatial.rank == 0:
-            sizes.extend(self.spatial._sizes)
-            names.extend(self.spatial._names)
-            types.extend(self.spatial._types)
+            sizes.extend(self.spatial.sizes)
+            names.extend(self.spatial.names)
+            types.extend(self.spatial.types)
         else:
-            sizes.extend(self.spatial._sizes)
-            names.extend(self.spatial._names)
-            types.extend(self.spatial._types)
+            sizes.extend(self.spatial.sizes)
+            names.extend(self.spatial.names)
+            types.extend(self.spatial.types)
             if set(self.spatial.names) != set(other.spatial.names):
                 raise IncompatibleShapes(self, other)
             for size, name, type in other.spatial.dimensions:
@@ -199,17 +187,17 @@ class Shape:
         # --- channel ---
         # channel dimensions must match exactly or one shape has none
         if self.channel.rank == 0:
-            sizes.extend(other.channel._sizes)
-            names.extend(other.channel._names)
-            types.extend(other.channel._types)
+            sizes.extend(other.channel.sizes)
+            names.extend(other.channel.names)
+            types.extend(other.channel.types)
         elif other.channel.rank == 0:
-            sizes.extend(self.channel._sizes)
-            names.extend(self.channel._names)
-            types.extend(self.channel._types)
+            sizes.extend(self.channel.sizes)
+            names.extend(self.channel.names)
+            types.extend(self.channel.types)
         else:
-            sizes.extend(self.channel._sizes)
-            names.extend(self.channel._names)
-            types.extend(self.channel._types)
+            sizes.extend(self.channel.sizes)
+            names.extend(self.channel.names)
+            types.extend(self.channel.types)
             if set(self.channel.names) != set(other.channel.names):
                 raise IncompatibleShapes(self, other)
             for size, name, type in other.channel.dimensions:
@@ -226,16 +214,16 @@ class Shape:
         The resulting shape has linear indices.
         """
         if pos is None:
-            same_type_dims = self.filtered(self._types == dim_type)
+            same_type_dims = self.filtered([t == dim_type for t in self.types])
             if len(same_type_dims) > 0:
                 pos = self.index(same_type_dims.names[0])
             else:
                 pos = {BATCH_DIM: 0, SPATIAL_DIM: self.batch.rank+1, CHANNEL_DIM: self.rank + 1}[dim_type]
         elif pos < 0:
             pos += self.rank + 1
-        sizes = list(self._sizes)
-        names = list(self._names)
-        types = list(self._types)
+        sizes = list(self.sizes)
+        names = list(self.names)
+        types = list(self.types)
         sizes.insert(pos, size)
         names.insert(pos, name)
         types.insert(pos, dim_type)
@@ -243,11 +231,11 @@ class Shape:
 
     def without(self, other):
         if isinstance(other, (str, int)):
-            return self[np.argwhere(self._names != other)[:, 0]]
+            return self[[i for i in range(self.rank) if self.names[i] != other]]
         if isinstance(other, (tuple, list)):
-            return self[np.argwhere([name not in other for name in self._names])[:, 0]]
+            return self[np.argwhere([name not in other for name in self.names])[:, 0]]
         elif isinstance(other, Shape):
-            return self[np.argwhere([name not in other._names for name in self._names])[:, 0]]
+            return self[np.argwhere([name not in other.names for name in self.names])[:, 0]]
         elif other is None:
             return EMPTY_SHAPE
         else:
@@ -259,18 +247,18 @@ class Shape:
 
     @property
     def well_defined(self):
-        return None not in self._sizes
+        return None not in self.sizes
 
     def with_sizes(self, sizes):
-        return Shape(sizes, self._names, self._types)
+        return Shape(sizes, self.names, self.types)
 
     def with_size(self, name, size):
-        new_sizes = list(self._sizes)
+        new_sizes = list(self.sizes)
         new_sizes[self.index(name)] = size
         return self.with_sizes(new_sizes)
 
     def perm(self, names):
-        assert set(names) == set(self._names), 'names must match existing dimensions %s but got %s' % (self.names, names)
+        assert set(names) == set(self.names), 'names must match existing dimensions %s but got %s' % (self.names, names)
         perm = [self.names.index(name) for name in names]
         return perm
 
@@ -280,9 +268,11 @@ class Shape:
         Returns the total number of values contained in a tensor of this shape.
         This is the product of all dimension sizes.
         """
-        if None in self._sizes:
+        if None in self.sizes:
             return None
-        return math.prod(self._sizes)
+        if self.rank == 0:
+            return 1
+        return math.prod(self.sizes)
 
     def order(self, sequence, default=None):
         """
@@ -296,7 +286,7 @@ class Shape:
         :return: ordered sequence of values
         """
         if isinstance(sequence, dict):
-            result = [sequence.get(name, default) for name in self._names]
+            result = [sequence.get(name, default) for name in self.names]
             return result
         if isinstance(sequence, (tuple, list)):
             assert len(sequence) == self.rank
