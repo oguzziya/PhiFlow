@@ -3,7 +3,7 @@ from functools import partial
 
 import numpy as np
 
-from ._shape import BATCH_DIM, CHANNEL_DIM, SPATIAL_DIM, Shape, EMPTY_SHAPE
+from ._shape import BATCH_DIM, CHANNEL_DIM, SPATIAL_DIM, Shape, EMPTY_SHAPE, spatial_shape
 from ._track import as_sparse_linear_operation, SparseLinearOperation, pad_operator, sum_operators
 from .backend import extrapolation, math
 from ._tensors import AbstractTensor, tensor, broadcastable_native_tensors, NativeTensor, CollapsedTensor, TensorStack, combined_shape
@@ -35,6 +35,13 @@ def transpose(tensor, axes):
         return math.transpose(tensor, axes)
 
 
+def meshgrid(*coordinates):
+    indices_list = math.meshgrid(*coordinates)
+    single_shape = spatial_shape([len(coo) for coo in coordinates])
+    channels = [NativeTensor(t, single_shape) for t in indices_list]
+    return TensorStack(channels, 0, CHANNEL_DIM)
+
+
 def channel_stack(values, axis=0):
     return _stack(values, axis, CHANNEL_DIM)
 
@@ -53,7 +60,6 @@ def _stack(values, dim, dim_type):
 
     result = broadcast_op(inner_stack, values)
     return result
-
 
 
 def concat(values, axis):

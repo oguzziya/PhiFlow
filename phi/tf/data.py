@@ -1,14 +1,13 @@
 import warnings
 
-from . import tf
+import tensorflow as tf
+
 from phi import struct, math
 from phi.data.fluidformat import _transform_for_writing, _writing_staticshape, read_zipped_array, _slugify_filename
-from phi.math import is_static_shape
 from phi.physics.world import StateProxy
 from phi.struct.context import _unsafe
 from phi.data import SceneSource, Dataset as BaseDataset
 
-from .util import placeholder, dataset_handle
 from ..data.stream import consecutive_frames, FrameSelect
 
 

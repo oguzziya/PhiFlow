@@ -164,6 +164,9 @@ class SciPyBackend(Backend):
     def ones_like(self, tensor):
         return np.ones_like(tensor)
 
+    def meshgrid(self, *coordinates):
+        return np.meshgrid(*coordinates, indexing='ij')
+
     def mean(self, value, axis=None, keepdims=False):
         return np.mean(value, axis, keepdims=keepdims)
 

@@ -2,10 +2,12 @@ import numbers
 import uuid
 import warnings
 
+import numpy as np
+import tensorflow as tf
+
 from phi.math.backend import Backend, split_multi_mode_pad, PadSettings, general_grid_sample_nd, circular_pad, replicate_pad, extrapolation
-from phi.math.backend.scipy_backend import SciPyBackend, SCIPY_BACKEND
-from phi.tf.tf_cuda_resample import *
-from . import tf
+from phi.math.backend.scipy_backend import SCIPY_BACKEND, SciPyBackend
+from .tf_cuda_resample import resample_cuda, use_cuda
 
 
 class TFBackend(Backend):

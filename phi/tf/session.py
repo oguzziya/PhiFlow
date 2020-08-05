@@ -4,7 +4,8 @@ import os
 import threading
 
 import numpy as np
-from . import tf
+import tensorflow as tf
+
 from phi import struct
 from .profiling import Timeliner
 from .util import isplaceholder, istensor

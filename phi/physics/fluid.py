@@ -67,12 +67,13 @@ def masked_laplace(pressure: CenteredGrid, active: CenteredGrid, accessible: Cen
     active_pressure = extended_active_mask * extended_pressure
     by_dim = []
     for dim in pressure.shape.spatial.names:
+        dx = pressure.shape.spatial.sequence_get(pressure.dx, dim)
         lower_active_pressure, upper_active_pressure = _multi_roll(active_pressure, dim, (-1, 1), diminish_others=(1, 1), names=pressure.shape.spatial.names)
         lower_accessible, upper_accessible = _multi_roll(extended_fluid_mask, dim, (-1, 1), diminish_others=(1, 1), names=pressure.shape.spatial.names)
         upper = upper_active_pressure * active.data
         lower = lower_active_pressure * active.data
         center = (- lower_accessible - upper_accessible) * pressure.data
-        by_dim.append(center + upper + lower)
+        by_dim.append((center + upper + lower) / dx ** 2)
     data = math.sum(by_dim, axis=0)
     return CenteredGrid(data, pressure.box, pressure.extrapolation.gradient())
 

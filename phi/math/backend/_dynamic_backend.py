@@ -26,9 +26,8 @@ class DynamicBackend(Backend):
         for backend in self.backends:
             backend.precision = precision
 
-    def choose_backend(self, values):
-        # type: (list) -> Backend
-        if not isinstance(values, tuple) and not isinstance(values, list):
+    def choose_backend(self, values: list) -> Backend:
+        if not isinstance(values, (list, tuple)):
             values = [values]
         for backend in self.backends:
             if backend.is_applicable(values):
@@ -126,6 +125,9 @@ class DynamicBackend(Backend):
 
     def ones_like(self, tensor):
         return self.choose_backend(tensor).ones_like(tensor)
+
+    def meshgrid(self, *coordinates):
+        return self.choose_backend(coordinates).meshgrid(*coordinates)
 
     def dot(self, a, b, axes):
         return self.choose_backend([a, b]).dot(a, b, axes)

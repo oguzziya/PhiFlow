@@ -1,6 +1,6 @@
 from phi.flow import *
 
-domain = Domain([64, 80], boundaries=CLOSED)  # , box=box[0:100, 0:100] TODO pressure not correct
+domain = Domain([64, 80], boundaries=CLOSED, box=box[0:100, 0:100])
 dt = 1.0
 buoyancy_factor = 0.1
 

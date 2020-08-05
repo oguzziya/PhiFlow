@@ -1,6 +1,6 @@
 from phi.geom import AABox
 from phi.field import CenteredGrid
-from . import tf
+
 
 
 def conv_layer(grid, filters, kernel_size, strides=1, padding='valid', activation=None, use_bias=True, name=None, trainable=True, reuse=None):

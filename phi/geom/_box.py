@@ -240,10 +240,8 @@ def bounding_box(geometry):
 
 class GridCell(Cuboid):
 
-    def __init__(self, resolution, bounds: AbstractBox):
-        idx_zyx = np.meshgrid(*[np.linspace(0.5 / dim, 1 - 0.5 / dim, dim) for dim in resolution.sizes], indexing="ij")
-        idx = [NativeTensor(t, resolution) for t in idx_zyx]
-        local_coords = TensorStack(idx, 0, CHANNEL_DIM)
+    def __init__(self, resolution: math.Shape, bounds: AbstractBox):
+        local_coords = math.meshgrid(*[np.linspace(0.5 / size, 1 - 0.5 / size, size) for size in resolution.sizes])
         points = bounds.local_to_global(local_coords)
         Cuboid.__init__(self, points, half_size=bounds.size / resolution.sizes / 2)
         self._resolution = resolution

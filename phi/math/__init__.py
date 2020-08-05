@@ -10,6 +10,7 @@ from ._tensor_math import (
     is_tensor, as_tensor,
     copy,
     transpose,
+    meshgrid,
     batch_stack, spatial_stack, channel_stack,
     concat,
     pad, spatial_pad,

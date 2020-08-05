@@ -153,6 +153,9 @@ class Backend:
     def ones_like(self, tensor):
         raise NotImplementedError(self)
 
+    def meshgrid(self, *coordinates):
+        raise NotImplementedError(self)
+
     def dot(self, a, b, axes):
         raise NotImplementedError(self)
 

@@ -1,4 +1,4 @@
-from phi.flow import *
+from phi.tf.flow import *
 
 domain = Domain([64, 64], boundaries=PERIODIC, box=box[0:100, 0:100])
 # velocity = domain.vec_grid(Noise((2,))) * 2
