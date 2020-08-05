@@ -68,9 +68,9 @@ def as_sparse_linear_operation(tensor: AbstractTensor):
 
 
 def pad_operator(tensor: SparseLinearOperation, pad_widths: dict, mode: Extrapolation):
-    assert len(tensor.shape) == 2  # TODO nd
     (row, col), data = math.coordinates(tensor.dependency_matrix)
     if mode == extrapolation.ZERO:
+        assert len(tensor.shape) == 2  # TODO nd
         y = row // tensor.shape[1]
         dy0, dy1 = pad_widths[tensor.shape.names[0]]
         dx0, dx1 = pad_widths[tensor.shape.names[1]]

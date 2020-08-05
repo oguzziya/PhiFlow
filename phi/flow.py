@@ -1,6 +1,7 @@
 # pylint: disable-msg = wildcard-import, unused-wildcard-import, unused-import
 
 from .physics.physics import *
+from .physics.common_physics import *
 from .physics.world import *
 from .physics.schroedinger import *
 from .physics.fluid import *

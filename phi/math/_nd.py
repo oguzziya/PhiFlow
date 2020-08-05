@@ -309,3 +309,7 @@ def interpolate_linear(tensor: AbstractTensor, start, size):
 
 def vec_abs(tensor: AbstractTensor):
     return math.sqrt(math.sum(tensor ** 2, axis=tensor.shape.channel.names))
+
+
+def vec_squared(tensor: AbstractTensor):
+    return math.sum(tensor ** 2, axis=tensor.shape.channel.names)

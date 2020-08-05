@@ -8,7 +8,7 @@ from numbers import Number
 import numpy as np
 
 from phi import math, struct, field
-from phi.geom import union
+from phi.geom import union, GridCell
 from phi.field import Field, mask, AngularVelocity, CenteredGrid, StaggeredGrid, resample, Grid
 
 from .domain import Domain, DomainState
@@ -222,19 +222,16 @@ Projects the given velocity field by solving for and subtracting the pressure.
     :param obstacles: list of Obstacles
     :return: divergence-free velocity as StaggeredGrid
     """
-    obstacle_mask = mask(union([obstacle.geometry for obstacle in obstacles]), antialias=False)
-    if obstacle_mask is not None:
-        obstacle_grid = CenteredGrid.sample(obstacle_mask, velocity.resolution, velocity.box, math.extrapolation.ZERO)
-        active_mask = 1 - obstacle_grid
-    else:
-        active_mask = CenteredGrid.sample(1, velocity.resolution, velocity.box, math.extrapolation.ZERO)
+    obstacle_mask = mask(union([obstacle.geometry for obstacle in obstacles]))
+    active_mask = 1 - obstacle_mask.sample_at(GridCell(velocity.resolution, velocity.box).center)
+    active_mask = CenteredGrid(active_mask, velocity.box, math.extrapolation.ZERO)
     accessible_mask = CenteredGrid(active_mask.data, active_mask.box, Material.accessible_extrapolation_mode(domain.boundaries))
     # --- Boundary Conditions---
     hard_bcs = field.stagger(accessible_mask, math.minimum)
     velocity *= hard_bcs
     for obstacle in obstacles:
         if not obstacle.is_stationary:
-            obs_mask = mask(obstacle.geometry, antialias=True)
+            obs_mask = mask(obstacle.geometry)
             angular_velocity = AngularVelocity(location=obstacle.geometry.center, strength=obstacle.angular_velocity, falloff=None)
             velocity = ((1 - obs_mask) * velocity + obs_mask * (angular_velocity + obstacle.velocity)).at(velocity)
     # --- Pressure solve ---

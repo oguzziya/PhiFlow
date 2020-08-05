@@ -6,7 +6,7 @@ buoyancy_factor = 0.1
 
 velocity = domain.grid(0, StaggeredGrid)
 density = domain.grid(0)
-inflow = field.resample(mask(Sphere(center=(50, 10), radius=5)), density) * 0.2
+inflow = mask(Sphere(center=(50, 10), radius=5)).sample_at(density.elements) * 0.2
 divergence = domain.grid(0)
 
 

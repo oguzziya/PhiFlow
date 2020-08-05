@@ -1,6 +1,5 @@
 from phi import math
 from phi.geom import Geometry
-from ._field import Field
 from ._analytic import AnalyticField
 
 
@@ -13,10 +12,8 @@ class GeometryMask(AnalyticField):
 
     """
 
-    def __init__(self, geometry, antialias=False):
-        assert isinstance(geometry, Geometry)
+    def __init__(self, geometry: Geometry):
         self.geometry = geometry
-        self.antialias = bool(antialias)
 
     @property
     def shape(self):
@@ -24,11 +21,9 @@ class GeometryMask(AnalyticField):
 
     def sample_at(self, points, reduce_channels=()):
         if isinstance(points, Geometry):
-            if self.antialias:
-                return self.geometry.approximate_fraction_inside(points)
-            else:
-                points = points.center
-        return math.to_float(self.geometry.lies_inside(points))
+            return self.geometry.approximate_fraction_inside(points)
+        else:
+            return math.to_float(self.geometry.lies_inside(points))
 
 
 mask = GeometryMask

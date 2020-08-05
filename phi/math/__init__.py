@@ -58,7 +58,7 @@ from ._nd import (
     gradient, laplace,
     fourier_laplace, fourier_poisson, abs_square,
     downsample2x, upsample2x, interpolate_linear,
-    spatial_sum, vec_abs
+    spatial_sum, vec_abs, vec_squared
 )
 
 # Setup Backend

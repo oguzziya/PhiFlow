@@ -35,7 +35,7 @@ Very close to the sphere center, the distance takes a constant value.
         :param location: float tensor of shape (batch_size, ..., rank)
         :return: float tensor of shape (*location.shape[:-1], 1).
         """
-        distance_squared = math.vec_abs(location - self.center)
+        distance_squared = math.vec_squared(location - self.center)
         distance_squared = math.maximum(distance_squared, self.radius * 1e-2)  # Prevent infinite gradient at sphere center
         distance = math.sqrt(distance_squared)
         return distance - self.radius
