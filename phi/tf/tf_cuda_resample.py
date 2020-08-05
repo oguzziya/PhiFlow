@@ -3,7 +3,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.python.framework import ops
 
-from phi.struct.tensorop import collapsed_gather_nd
+from phi.math.backend.tensorop import collapsed_gather_nd
 
 # Load Custom Ops
 librariesLoaded = False

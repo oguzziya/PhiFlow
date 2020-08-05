@@ -1,5 +1,5 @@
-from phi.math._tensors import AbstractTensor
-from phi.struct.tensorop import collapsed_gather_nd
+from ._tensors import AbstractTensor
+from .backend.tensorop import collapsed_gather_nd
 
 
 def _get_pad_width_axes(rank, axes, val_true=(1, 1), val_false=(0, 0)):

@@ -2,7 +2,7 @@ import numpy as np
 
 from ._shape import define_shape, EMPTY_SHAPE, spatial_shape, CHANNEL_DIM
 from ._tensors import NativeTensor, CollapsedTensor, TensorStack
-from ..backend.scipy_backend import SCIPY_BACKEND
+from phi.math.backend.scipy_backend import SCIPY_BACKEND
 
 
 def zeros(channels=(), batch=None, dtype=None, **spatial):

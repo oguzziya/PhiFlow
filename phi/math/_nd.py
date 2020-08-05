@@ -6,14 +6,12 @@ import warnings
 import numpy as np
 
 from phi import struct
-from phi.backend import Extrapolation
-from phi.struct.functions import mappable
+from .backend import Extrapolation, extrapolation
 from . import _tensor_math as math
 from ._shape import CHANNEL_DIM, spatial_shape, channel_shape
 from ._tensor_math import broadcast_op
 from ._tensors import tensor, AbstractTensor, TensorStack, NativeTensor
 from ._helper import _get_pad_width, _contains_axis, _multi_roll
-from ..backend import extrapolation
 
 
 def indices_tensor(tensor, dtype=None):
@@ -99,7 +97,6 @@ def frequency_loss(tensor, frequency_falloff=100, reduce_batches=True):
     return l1_loss(diff_fft * weights, reduce_batches=reduce_batches)
 
 
-@mappable()
 def abs_square(complex):
     return math.imag(complex) ** 2 + math.real(complex) ** 2
 
@@ -217,7 +214,6 @@ def _sliced_laplace_nd(x_, dx, padding, axes=None):
     return result
 
 
-@mappable()
 def fourier_laplace(tensor, times=1):
     """
 Applies the spatial laplce operator to the given tensor with periodic boundary conditions.
@@ -236,7 +232,6 @@ The result for periodic fields is exact, i.e. no numerical instabilities can occ
     return math.real(math.ifft(frequencies * fft_laplace ** times))
 
 
-@mappable()
 def fourier_poisson(tensor, times=1):
     """ Inverse operation to `fourier_laplace`. """
     frequencies = math.fft(math.to_complex(tensor))

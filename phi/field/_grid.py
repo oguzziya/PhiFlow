@@ -1,15 +1,14 @@
 from abc import ABC
 
 import numpy as np
-import six
 
 from phi import math
 from phi.geom import AABox, GridCell, Geometry
 from phi.geom import assert_same_rank
 from phi.struct.functions import mappable
-from phi.struct.tensorop import collapse
 from ._field import Field
-from ..backend import Extrapolation, general_grid_sample_nd
+from phi.math.backend.tensorop import collapse
+from phi.math.backend import Extrapolation, general_grid_sample_nd
 from ..math import Shape, tensor, AbstractTensor
 
 
@@ -177,40 +176,8 @@ def _required_paddings_transposed(box, dx, target, threshold=1e-5):
     return [lower, upper]
 
 
-def _pad_mode(extrapolation):
-    """ Inserts 'constant' padding for batch dimension and channel dimension. """
-    if isinstance(extrapolation, six.string_types):
-        return _pad_mode_str(extrapolation)
-    else:
-        return _pad_mode_str(['constant'] + list(extrapolation) + ['constant'])
-
-
-def _pad_value(value):
-    if math.is_tensor(value):
-        return value
-    else:
-        return [0] + list(value) + [0]
-
-
-@mappable()
-def _pad_mode_str(extrapolation):
-    """
-Converts an extrapolation string (or struct of strings) to a string that can be passed to math functions like math.pad or math.resample.
-    :param extrapolation: field extrapolation
-    :return: padding mode, same type as extrapolation
-    """
-    return {'periodic': 'circular',
-            'boundary': 'replicate',
-            'constant': 'constant'}[extrapolation]
-
-
 @mappable()
 def _gradient_extrapolation(field_extrapolation):
-    """
-Given the extrapolation of a field, returns the extrapolation mode of the corresponding gradient field.
-    :param extrapolation: string or struct of strings
-    :return: same type as extrapolation
-    """
     return field_extrapolation.gradient()
 
 

@@ -1,4 +1,3 @@
-import six
 from collections import namedtuple
 
 import numpy as np
@@ -110,7 +109,7 @@ def pad_constant_boundaries(grid, coords, boundary, math):
 
 
 def apply_boundary(boundary, coords, input_size, math):
-    if isinstance(boundary, six.string_types):
+    if isinstance(boundary, str):
         return _apply_single_boundary(boundary, coords, input_size, math)
     coords = math.unstack(coords, axis=-1)
     assert len(input_size) == len(coords)

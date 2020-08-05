@@ -12,7 +12,6 @@ import warnings
 from os.path import isfile
 
 import numpy as np
-import six
 from phi import struct
 from phi.data.fluidformat import Scene, write_sim_frame
 from phi.field import CenteredGrid, Field, StaggeredGrid
@@ -234,7 +233,7 @@ class App(object):
                     editable_value = EditableInt(value_name, val)
                 elif isinstance(val, numbers.Number):  # Float
                     editable_value = EditableFloat(value_name, val)
-                elif isinstance(val, six.string_types):
+                elif isinstance(val, str):
                     editable_value = EditableString(value_name, val)
             if editable_value:
                 self._controls.append(Control(self, name, editable_value))

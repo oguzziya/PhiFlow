@@ -6,12 +6,12 @@ from phi import math
 from phi.geom import box
 from phi.physics.collective import StateCollection
 from phi.physics.domain import Domain
-from phi.field import CenteredGrid, _manta
+from phi.field import CenteredGrid
 from phi import struct
 from phi.physics.fluid import Fluid
 from phi.struct import VARIABLES, CONSTANTS
 from phi.struct.functions import mappable
-from phi.struct.tensorop import collapse, collapsed_gather_nd, expand
+from phi.math.backend.tensorop import collapse, collapsed_gather_nd, expand
 
 
 def generate_test_structs():

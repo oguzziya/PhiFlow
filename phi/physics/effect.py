@@ -1,7 +1,5 @@
 import warnings
 
-import six
-
 from phi.geom import Geometry, GLOBAL_AXIS_ORDER
 from phi.field import Field, mask, ConstantField
 from phi import math, struct
@@ -16,7 +14,7 @@ FIX = 'fix'
 class FieldEffect(State):
 
     def __init__(self, field, targets, mode=GROW, bounds=None, tags=('effect',), **kwargs):
-        if isinstance(targets, six.string_types):
+        if isinstance(targets, str):
             targets = [targets]
         tags = tuple(tags) + tuple('%s_effect' % target for target in targets)
         State.__init__(self, **struct.kwargs(locals()))

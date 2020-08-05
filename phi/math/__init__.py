@@ -1,5 +1,5 @@
-from phi.backend import DYNAMIC_BACKEND, extrapolation
-from phi.backend.scipy_backend import SCIPY_BACKEND
+from .backend import DYNAMIC_BACKEND, extrapolation
+from .backend.scipy_backend import SCIPY_BACKEND
 
 from phi.struct.struct_backend import StructBroadcastBackend
 

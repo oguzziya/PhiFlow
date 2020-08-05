@@ -1,6 +1,6 @@
 import numpy as np
 
-from phi.backend import DYNAMIC_BACKEND as math, Extrapolation, extrapolation
+from .backend import DYNAMIC_BACKEND as math, Extrapolation, extrapolation
 from ._tensors import AbstractTensor, NativeTensor, combined_shape
 
 

@@ -1,21 +1,11 @@
 import numbers
 import uuid
 import warnings
-from packaging import version
-import six
 
-import numpy as np
-import six
-import tensorflow as tf
-from packaging import version
-
-from phi.backend.backend_helper import split_multi_mode_pad, PadSettings, general_grid_sample_nd, equalize_shapes, circular_pad, replicate_pad
-from phi.backend.scipy_backend import SciPyBackend, SCIPY_BACKEND
+from phi.math.backend import Backend, split_multi_mode_pad, PadSettings, general_grid_sample_nd, circular_pad, replicate_pad, extrapolation
+from phi.math.backend.scipy_backend import SciPyBackend, SCIPY_BACKEND
 from phi.tf.tf_cuda_resample import *
 from . import tf
-
-from phi.backend.backend import Backend
-from phi.backend.tensorop import expand, collapsed_gather_nd
 
 
 class TFBackend(Backend):
@@ -63,11 +53,7 @@ class TFBackend(Backend):
         return tf.equal(x, y)
 
     def divide_no_nan(self, x, y):
-        if version.parse(tf.__version__) >= version.parse('1.11.0'):
-            return tf.div_no_nan(x, y)
-        else:
-            result = x / y
-            return tf.where(tf.is_finite(result), result, tf.zeros_like(result))
+        return tf.div_no_nan(x, y)
 
     def random_uniform(self, shape):
         return tf.random.uniform(shape, dtype=self.precision_dtype)
@@ -92,8 +78,8 @@ class TFBackend(Backend):
     def concat(self, values, axis):
         return tf.concat(values, axis)
 
-    def pad(self, value, pad_width, mode='constant', constant_values=0):
-        passes = split_multi_mode_pad(self.ndims(value), PadSettings(pad_width, mode, constant_values), split_by_constant_value=True)
+    def pad(self, value, pad_width, mode=extrapolation.ZERO):
+        passes = split_multi_mode_pad(self.ndims(value), PadSettings(pad_width, mode))
         for pad_pass in passes:
             value = self._single_mode_single_constant_pad(value, *pad_pass)
         return value
@@ -246,7 +232,7 @@ class TFBackend(Backend):
         return tf.exp(x)
 
     def conv(self, tensor, kernel, padding="SAME"):
-        rank = tensor_spatial_rank(tensor)
+        rank = len(tensor.shape) - 2
         padding = padding.upper()
         if rank == 1:
             result = tf.nn.conv1d(tensor, kernel, 1, padding)
@@ -298,17 +284,7 @@ class TFBackend(Backend):
         return tf.gather(values, indices)
 
     def gather_nd(self, values, indices, batch_dims=0):
-        if batch_dims == 0:
-            return tf.gather_nd(values, indices)
-        elif version.parse(tf.__version__) >= version.parse('1.14.0'):
-            return tf.gather_nd(values, indices, batch_dims=batch_dims)
-        else:
-            if batch_dims > 1: raise NotImplementedError('batch_dims > 1 only supported on TensorFlow >= 1.14')
-            batch_size = self.shape(values)[0]
-            batch_ids = tf.reshape(tf.range(batch_size), [batch_size] + [1] * (self.ndims(indices) - 1))
-            batch_ids = tf.tile(batch_ids, [1] + self.shape(indices)[1:-1] + [1])
-            indices = tf.concat([batch_ids, indices], -1)
-            return tf.gather_nd(values, indices)
+        return tf.gather_nd(values, indices, batch_dims=batch_dims)
 
     def unstack(self, tensor, axis=0, keepdims=False):
         unstacked = tf.unstack(tensor, axis=axis)
@@ -419,140 +395,4 @@ class TFBackend(Backend):
         return tf.SparseTensor(indices=indices, values=values, dense_shape=shape)
 
 
-# from niftynet.layer.resampler.py
-# https://cmiclab.cs.ucl.ac.uk/CMIC/NiftyNet/blob/69c98e5a95cc6788ad9fb8c5e27dc24d1acec634/niftynet/layer/resampler.py
-
-
-COORDINATES_TYPE = tf.int32
-EPS = 1e-6
-
-
-def tensor_spatial_rank(tensor):
-    return len(tensor.shape) - 2
-
-
-def unit_direction(dim, spatial_rank):  # ordered like z,y,x
-    direction = [1 if i == dim else 0 for i in range(spatial_rank)]
-    for _i in range(spatial_rank):
-        direction = tf.expand_dims(direction, axis=0)
-    return direction
-
-
-def _resample_no_pack(grid, coords, boundary_func):
-    resolution = np.array([int(d) for d in grid.shape[1:-1]])
-    sp_rank = tensor_spatial_rank(grid)
-
-    floor = boundary_func(tf.floor(coords), resolution)
-    up_weights = coords - floor
-    lo_weights = TFBackend().unstack(1 - up_weights, axis=-1, keepdims=True)
-    up_weights = TFBackend().unstack(up_weights, axis=-1, keepdims=True)
-    base_coords = tf.cast(floor, tf.int32)
-
-    def interpolate_nd(coords, axis):
-        direction = np.array([1 if ax == axis else 0 for ax in range(sp_rank)])
-        print(direction.shape)
-        with tf.variable_scope('coord_plus_one'):
-            up_coords = coords + direction  # This is extremely slow for some reason - ToDo tile direction array to have same dimensions before calling interpolate_nd?
-        if axis == sp_rank - 1:
-            # up_coords = boundary_func(up_coords, resolution)
-            lo_values = tf.gather_nd(grid, coords, batch_dims=1)
-            up_values = tf.gather_nd(grid, up_coords, batch_dims=1)
-        else:
-            lo_values = interpolate_nd(coords, axis + 1)
-            up_values = interpolate_nd(up_coords, axis + 1)
-        with tf.variable_scope('weighted_sum_axis_%d' % axis):
-            return lo_values * lo_weights[axis] + up_values * up_weights[axis]
-
-    with tf.variable_scope('interpolate_nd'):
-        result = interpolate_nd(base_coords, 0)
-    return result
-
-
-def _resample_linear_niftynet(inputs, sample_coords, boundary, boundary_func, float_type):
-    inputs = tf.convert_to_tensor(inputs)
-    sample_coords = tf.convert_to_tensor(sample_coords)
-
-    in_spatial_size = [int(d) for d in inputs.shape[1:-1]]
-    in_spatial_rank = tensor_spatial_rank(inputs)
-    batch_size = tf.shape(inputs)[0]
-
-    out_spatial_rank = tensor_spatial_rank(sample_coords)
-    out_spatial_size = sample_coords.get_shape().as_list()[1:-1]
-
-    if sample_coords.shape[0] != inputs.shape[0]:
-        sample_coords = tf.tile(sample_coords, [batch_size]+[1]*(len(sample_coords.shape)-1))
-
-    xy = tf.unstack(sample_coords, axis=-1)
-    base_coords = [tf.floor(coords) for coords in xy]
-    floor_coords = [tf.cast(boundary_func(x, in_spatial_size[idx]), COORDINATES_TYPE) for (idx, x) in enumerate(base_coords)]
-    ceil_coords = [tf.cast(boundary_func(x + 1.0, in_spatial_size[idx]), COORDINATES_TYPE) for (idx, x) in enumerate(base_coords)]
-
-    if boundary.upper() == 'ZERO':
-        weight_0 = [tf.expand_dims(x - tf.cast(i, float_type), -1) for (x, i) in zip(xy, floor_coords)]
-        weight_1 = [tf.expand_dims(tf.cast(i, float_type) - x, -1) for (x, i) in zip(xy, ceil_coords)]
-    else:
-        weight_0 = [tf.expand_dims(x - i, -1) for (x, i) in zip(xy, base_coords)]
-        weight_1 = [1.0 - w for w in weight_0]
-
-    batch_ids = tf.reshape(tf.range(batch_size), [batch_size] + [1] * out_spatial_rank)
-    batch_ids = tf.tile(batch_ids, [1] + out_spatial_size)
-    sc = (floor_coords, ceil_coords)
-    binary_neighbour_ids = [[int(c) for c in format(i, '0%ib' % in_spatial_rank)] for i in range(2 ** in_spatial_rank)]
-
-    def get_knot(bc):
-        coord = [sc[c][i] for i, c in enumerate(bc)]
-        if version.parse(tf.__version__) >= version.parse('1.14.0'):
-            coord = tf.stack(coord, -1)
-            return tf.gather_nd(inputs, coord, batch_dims=1)  # NaN can cause negative integers here
-        else:
-            coord = tf.stack([batch_ids] + coord, -1)
-            return tf.gather_nd(inputs, coord)  # NaN can cause negative integers here
-
-
-
-    samples = [get_knot(bc) for bc in binary_neighbour_ids]
-
-    def _pyramid_combination(samples, w_0, w_1):
-        if len(w_0) == 1:
-            return samples[0] * w_1[0] + samples[1] * w_0[0]
-        f_0 = _pyramid_combination(samples[::2], w_0[:-1], w_1[:-1])
-        f_1 = _pyramid_combination(samples[1::2], w_0[:-1], w_1[:-1])
-        return f_0 * w_1[-1] + f_1 * w_0[-1]
-
-    return _pyramid_combination(samples, weight_0, weight_1)
-
-
-def _boundary_snap(sample_coords, spatial_shape):
-    max_indices = [l-1 for l in spatial_shape]
-    for _i in range(len(spatial_shape)):
-        max_indices = tf.expand_dims(max_indices, 0)
-    sample_coords = tf.minimum(sample_coords, max_indices)
-    sample_coords = tf.maximum(sample_coords, 0)
-    return sample_coords
-
-
-def _boundary_replicate(sample_coords, input_size):
-    return tf.maximum(tf.minimum(sample_coords, input_size - 1), 0)
-
-
-def _boundary_circular(sample_coords, input_size):
-    return tf.mod(tf.mod(sample_coords, input_size) + input_size, input_size)
-
-
-def _boundary_symmetric(sample_coords, input_size):
-    sample_coords = _boundary_circular(sample_coords, 2 * input_size)
-    return ((2 * input_size - 1) - tf.abs((2 * input_size - 1) - 2 * sample_coords)) // 2
-
-
-def _boundary_reflect(sample_coords, input_size):
-    sample_coords = _boundary_circular(sample_coords, 2 * input_size - 2)
-    return (input_size - 1) - tf.abs((input_size - 1) - sample_coords)
-
-
-SUPPORTED_BOUNDARY = {
-    'zero': _boundary_replicate,
-    'replicate': _boundary_replicate,
-    'circular': _boundary_circular,
-    'symmetric': _boundary_symmetric,
-    'reflect': _boundary_reflect,
-}
+TF_BACKEND = TFBackend()

@@ -1,4 +1,4 @@
-from phi.backend import Backend
+from phi.math.backend import Backend
 from . import struct, functions
 
 

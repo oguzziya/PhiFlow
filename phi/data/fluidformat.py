@@ -9,7 +9,6 @@ import shutil
 import sys
 import warnings
 
-import six
 import numpy as np
 from os.path import join, isfile, isdir
 
@@ -42,7 +41,7 @@ def _check_same_dimensions(arrays):
 
 
 def read_sim_frame(simpath, fieldnames, frame, set_missing_to_none=True):
-    if isinstance(fieldnames, six.string_types):
+    if isinstance(fieldnames, str):
         fieldnames = [fieldnames]
     for fieldname in fieldnames:
         filename = _filename(simpath, fieldname, frame)
@@ -81,7 +80,7 @@ def read_sim_frames(simpath, fieldnames=None, frames=None):
         frames = get_frames(simpath, fieldnames[0])
     if isinstance(frames, int):
         frames = [frames]
-    single_fieldname = isinstance(fieldnames, six.string_types)
+    single_fieldname = isinstance(fieldnames, str)
     if single_fieldname:
         fieldnames = [fieldnames]
 
@@ -200,7 +199,7 @@ class Scene(object):
         if struct.isstruct(obj):
             obj = _transform_for_writing(obj)
             names = struct.flatten(obj)
-            if not np.all([isinstance(n, six.string_types) for n in names]):
+            if not np.all([isinstance(n, str) for n in names]):
                 names = struct.names(obj)
             data = struct.map(lambda name: self.read_array(_slugify_filename(name), frame), names)
             return data

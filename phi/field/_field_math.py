@@ -3,7 +3,7 @@ from phi import math
 from phi.geom import AABox
 from . import StaggeredGrid
 from ._field import Field
-from ._grid import CenteredGrid, Grid, _pad_value, _pad_mode, _gradient_extrapolation
+from ._grid import CenteredGrid, Grid, _gradient_extrapolation
 from ..math import tensor
 
 

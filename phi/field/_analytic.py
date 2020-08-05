@@ -1,6 +1,6 @@
 from abc import ABC
 
-from phi.backend import Backend
+from phi.math.backend import Backend
 from phi import math, struct
 from phi.geom import assert_same_rank
 

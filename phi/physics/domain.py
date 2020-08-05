@@ -2,11 +2,11 @@ import numpy as np
 
 from phi import math, struct
 from phi.geom import AABox, GridCell
-from phi.struct.tensorop import collapse, collapsed_gather_nd
+from phi.math.backend.tensorop import collapse, collapsed_gather_nd
 from phi.field import CenteredGrid, StaggeredGrid
 from . import State
 from .material import OPEN, Material
-from ..math._shape import spatial_shape
+from ..math import spatial_shape
 
 
 class Domain:

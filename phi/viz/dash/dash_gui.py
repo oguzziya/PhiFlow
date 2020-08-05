@@ -3,7 +3,7 @@ import dash_core_components as dcc
 import dash_html_components as html
 import six
 
-from phi.struct.tensorop import collapsed_gather_nd
+from phi.math.backend.tensorop import collapsed_gather_nd
 from .board import build_benchmark, build_tf_profiler, build_tensorboard_launcher, build_system_controls
 from .log import build_log
 from .model_controls import build_model_controls

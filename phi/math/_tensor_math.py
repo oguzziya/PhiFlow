@@ -5,10 +5,10 @@ import numpy as np
 
 from ._shape import BATCH_DIM, CHANNEL_DIM, SPATIAL_DIM, Shape, EMPTY_SHAPE
 from ._track import as_sparse_linear_operation, SparseLinearOperation, pad_operator, sum_operators
-from ..backend import extrapolation, math
+from .backend import extrapolation, math
 from ._tensors import AbstractTensor, tensor, broadcastable_native_tensors, NativeTensor, CollapsedTensor, TensorStack, combined_shape
 from ._tensor_initializers import zeros
-from ..backend.scipy_backend import SCIPY_BACKEND
+from phi.math.backend.scipy_backend import SCIPY_BACKEND
 
 any_ = any
 
