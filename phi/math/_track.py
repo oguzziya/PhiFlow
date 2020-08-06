@@ -72,7 +72,8 @@ def as_sparse_linear_operation(tensor: AbstractTensor):
 
 
 def pad_operator(tensor: SparseLinearOperation, pad_widths: dict, mode: Extrapolation):
-    (row, col), data = math.coordinates(tensor.dependency_matrix)
+    # TODO create large index array reshape(range(...)), then pad?
+    (row, col), data = math.coordinates(tensor.dependency_matrix, unstack_coordinates=True)
     if mode == extrapolation.ZERO:
         assert len(tensor.shape) == 2  # TODO nd
         y = row // tensor.shape[1]

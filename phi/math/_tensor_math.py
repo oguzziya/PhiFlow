@@ -572,16 +572,17 @@ def conjugate_gradient(A, y, x0, relative_tolerance: float = 1e-5, absolute_tole
             Ax_track = A(x_track)
             if isinstance(Ax_track, SparseLinearOperation):
                 A_ = Ax_track.dependency_matrix
-        except NotImplementedError:
-            pass
+            else:
+                warnings.warn("Could not create matrix for conjugate_gradient() because non-linear operations were used.")
+        except NotImplementedError as err:
+            warnings.warn("Could not create matrix for conjugate_gradient():\n%s" % err)
+            raise err
         if A_ is None:
-            warnings.warn("Could not create matrix for conjugate_gradient()")
-
             def A_(native_x):
                 x = math.reshape(native_x, x0.shape.non_batch.sizes)
                 x = NativeTensor(x, x0.shape.non_batch)
                 Ax = A(x)
-                Ax_native = math.reshape(Ax.native(), (y.shape.non_batch.volume,))
+                Ax_native = math.reshape(Ax.native(), math.shape(native_x))
                 return Ax_native
     else:
         A_ = math.reshape(A.native(), (y.shape.non_batch.volume, x0.shape.non_batch.volume))

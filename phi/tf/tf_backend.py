@@ -108,6 +108,13 @@ class TFBackend(Backend):
         if axis is not None:
             if not isinstance(axis, int):
                 axis = list(axis)
+        if isinstance(value, tf.SparseTensor):
+            return tf.sparse.reduce_sum(value, axis=axis, keepdims=keepdims, output_is_sparse=False)
+        if isinstance(value, (tuple, list)) and any([isinstance(x, tf.SparseTensor) for x in value]):
+            result = value[0]
+            for v in value[1:]:
+                result = tf.sparse.add(result, v, threshold=0)
+            return result
         return tf.reduce_sum(value, axis=axis, keepdims=keepdims)
 
     def prod(self, value, axis=None):
@@ -172,9 +179,9 @@ class TFBackend(Backend):
 
     def matmul(self, A, b):
         if isinstance(A, tf.SparseTensor):
-            result = tf.sparse_tensor_dense_matmul(A, tf.transpose(b))
+            result = tf.sparse.sparse_dense_matmul(A, tf.transpose(b))
             result = tf.transpose(result)
-            result.set_shape(tf.TensorShape([b.shape[0], A.shape[0]]))
+            # result.set_shape(tf.TensorShape([b.shape[0], A.shape[0]]))
             return result
         else:
             return tf.matmul(A, b)
@@ -298,6 +305,10 @@ class TFBackend(Backend):
             return tf.to_complex64(x)
 
     def gather(self, values, indices):
+        if isinstance(values, tf.SparseTensor):
+            if isinstance(indices, (tuple, list)) and indices[1] == slice(None):
+                result = sparse_select_indices(values, indices[0], axis=0, are_indices_sorted=True, are_indices_uniqua=True)
+                return result
         if isinstance(indices, slice):
             return values[indices]
         return tf.gather(values, indices)
@@ -342,7 +353,7 @@ class TFBackend(Backend):
         values = self.tile(values, repetitions)
 
         if duplicates_handling == 'add':
-            #Only for Tensorflow with custom gradient
+            # Only for Tensorflow with custom gradient
             @tf.custom_gradient
             def scatter_density(points, indices, values):
                 result = tf.tensor_scatter_add(buffer, indices, values)
@@ -418,7 +429,77 @@ class TFBackend(Backend):
             return SCIPY_BACKEND.dtype(array)
 
     def sparse_tensor(self, indices, values, shape):
+        indices = tf.cast(tf.stack(indices, axis=-1), tf.int64)
         return tf.SparseTensor(indices=indices, values=values, dense_shape=shape)
+
+    def coordinates(self, tensor, unstack_coordinates=False):
+        if isinstance(tensor, tf.SparseTensor):
+            idx = tensor.indices
+            if unstack_coordinates:
+                idx = tf.unstack(idx, axis=-1)
+            return idx, tensor.values
+        else:
+            raise NotImplementedError()
+
+    def conjugate_gradient(self, A, y, x0, relative_tolerance: float = 1e-5, absolute_tolerance: float = 0.0, max_iterations: int = 1000, gradient: str = 'implicit', callback=None):
+        backend = self
+
+        class LinOp(tf.linalg.LinearOperator):
+            def __init__(self):
+                tf.linalg.LinearOperator.__init__(self, y.dtype, graph_parents=None, is_non_singular=True, is_self_adjoint=True, is_positive_definite=True, is_square=True)
+
+            def _matmul(self, x, adjoint=False, adjoint_arg=False):
+                if callable(A):
+                    return A(x)
+                else:
+                    x = tf.reshape(x, x0.shape)
+                    result = backend.matmul(A, x)
+                    return tf.expand_dims(result, -1)
+
+            def _shape(self):
+                return y.shape
+
+            def _shape_tensor(self):
+                return y.shape
+
+        result = tf.linalg.experimental.conjugate_gradient(LinOp(), y, preconditioner=None, x=x0, tol=absolute_tolerance + relative_tolerance, max_iter=max_iterations)
+        converged = True
+        iterations = result.i
+        return converged, result.x, iterations
+
+    def add(self, a, b):
+        if isinstance(a, tf.SparseTensor) or isinstance(b, tf.SparseTensor):
+            return tf.sparse.add(a, b, threshold=1e-5)
+        else:
+            return Backend.add(self, a, b)
 
 
 TF_BACKEND = TFBackend()
+
+
+def sparse_select_indices(sp_input, indices, axis=0, are_indices_uniqua=False, are_indices_sorted=False):
+    if not are_indices_uniqua:
+        indices, _ = tf.unique(indices)
+    n_indices = tf.size(indices)
+    # Only necessary if indices may not be sorted
+    if not are_indices_sorted:
+        indices, _ = tf.math.top_k(indices, n_indices)
+        indices = tf.reverse(indices, [0])
+    # Get indices for the axis
+    idx = sp_input.indices[:, axis]
+    # Find where indices match the selection
+    eq = tf.equal(tf.expand_dims(idx, 1), tf.cast(indices, tf.int64))
+    # Mask for selected values
+    sel = tf.reduce_any(eq, axis=1)
+    # Selected values
+    values_new = tf.boolean_mask(sp_input.values, sel, axis=0)
+    # New index value for selected elements
+    n_indices = tf.cast(n_indices, tf.int64)
+    idx_new = tf.reduce_sum(tf.cast(eq, tf.int64) * tf.range(n_indices), axis=1)
+    idx_new = tf.boolean_mask(idx_new, sel, axis=0)
+    # New full indices tensor
+    indices_new = tf.boolean_mask(sp_input.indices, sel, axis=0)
+    indices_new = tf.concat([indices_new[:, :axis], tf.expand_dims(idx_new, 1), indices_new[:, axis + 1:]], axis=1)
+    # New shape
+    shape_new = tf.concat([sp_input.dense_shape[:axis], [n_indices], sp_input.dense_shape[axis + 1:]], axis=0)
+    return tf.SparseTensor(indices_new, values_new, shape_new)

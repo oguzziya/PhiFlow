@@ -371,7 +371,7 @@ class SciPyBackend(Backend):
 
     def dtype(self, array):
         if isinstance(array, float):
-            return self.precision_dtype
+            return self.precision_dtype(0).dtype
         if not isinstance(array, np.ndarray):
             array = np.array(array)
         return array.dtype

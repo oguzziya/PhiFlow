@@ -374,7 +374,6 @@ If `multiples` has more dimensions than `value`, these dimensions are added to `
         """
         raise NotImplementedError(self)
 
-
     def conjugate_gradient(self, A, y, x0, relative_tolerance: float = 1e-5, absolute_tolerance: float = 0.0, max_iterations: int = 1000, gradient: str = 'implicit', callback=None):
         """
         Solve the system of linear equations
