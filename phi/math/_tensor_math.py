@@ -1,4 +1,5 @@
 import numbers
+import time
 import warnings
 from functools import partial
 
@@ -566,12 +567,14 @@ def conjugate_gradient(A, y, x0, relative_tolerance: float = 1e-5, absolute_tole
     x0_native = math.reshape(x0.native(), (x0.shape.batch.volume, x0.shape.non_batch.volume))
     y_native = math.reshape(y.native(), (y.shape.batch.volume, y.shape.non_batch.volume))
     if callable(A):
+        build_time = time.time()
         x_track = as_sparse_linear_operation(x0)
         A_ = None
         try:
             Ax_track = A(x_track)
             if isinstance(Ax_track, SparseLinearOperation):
                 A_ = Ax_track.dependency_matrix
+                print("CG: matrix build time: %s" % (time.time() - build_time))
             else:
                 warnings.warn("Could not create matrix for conjugate_gradient() because non-linear operations were used.")
         except NotImplementedError as err:
@@ -587,7 +590,9 @@ def conjugate_gradient(A, y, x0, relative_tolerance: float = 1e-5, absolute_tole
     else:
         A_ = math.reshape(A.native(), (y.shape.non_batch.volume, x0.shape.non_batch.volume))
 
+    cg_time = time.time()
     converged, x, iterations = math.conjugate_gradient(A_, y_native, x0_native, relative_tolerance, absolute_tolerance, max_iterations, gradient, callback)
+    print("CG: loop time: %s (%s iterations)" % (time.time() - cg_time, iterations))
     converged = math.reshape(converged, batch.sizes)
     x = math.reshape(x, batch.sizes + x0.shape.non_batch.sizes)
     iterations = math.reshape(iterations, batch.sizes)
