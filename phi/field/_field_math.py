@@ -31,8 +31,8 @@ def stagger(field: CenteredGrid, face_function=math.minimum):
         all_lower.append(math.pad(field.data, {dim: (1, 0)}, field.extrapolation))
     all_upper = math.channel_stack(all_upper)
     all_lower = math.channel_stack(all_lower)
-    channels = face_function(all_lower, all_upper)
-    return math.channel_stack(channels)
+    result = face_function(all_lower, all_upper)
+    return result
 
 
 def divergence(field: StaggeredGrid):
@@ -58,9 +58,11 @@ def pad(grid: Grid, widths):
     widths_list = [widths[axis] for axis in grid.shape.spatial.names]
     if isinstance(grid, CenteredGrid):
         data = math.pad(grid.data, widths, grid.extrapolation)
-        w_lower, w_upper = tensor(np.transpose(widths_list))
+        w_lower = tensor([w[0] for w in widths_list])
+        w_upper = tensor([w[1] for w in widths_list])
         box = AABox(grid.box.lower - w_lower * grid.dx, grid.box.upper + w_upper * grid.dx)
         return CenteredGrid(data, box, grid.extrapolation)
+    raise NotImplementedError()
 
 
 def squared(field: Field):

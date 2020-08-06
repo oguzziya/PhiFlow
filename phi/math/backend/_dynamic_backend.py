@@ -129,7 +129,8 @@ class DynamicBackend(Backend):
         return self.choose_backend([inputs, sample_coords]).resample(inputs, sample_coords, interpolation=interpolation, boundary=boundary)
 
     def range(self, start, limit=None, delta=1, dtype=None):
-        return self.choose_backend([start, limit, delta], creation=True).range(start, limit, delta, dtype)
+        possible_tensors = [t for t in (start, limit, delta) if t is not None]
+        return self.choose_backend(possible_tensors, creation=True).range(start, limit, delta, dtype)
 
     def zeros(self, shape, dtype=None):
         return self.choose_backend([], creation=True).zeros(shape, dtype)
@@ -268,7 +269,11 @@ class DynamicBackend(Backend):
         return self.choose_backend(x).cos(x)
 
     def sparse_tensor(self, indices, values, shape):
-        return self.choose_backend([indices, values]).sparse_tensor(indices, values, shape)
+        if isinstance(indices, (tuple, list)):
+            backend = self.choose_backend([values, *indices])
+        else:
+            backend = self.choose_backend([indices, values])
+        return backend.sparse_tensor(indices, values, shape)
 
     def coordinates(self, tensor, unstack_coordinates=False):
         return self.choose_backend(tensor).coordinates(tensor, unstack_coordinates)

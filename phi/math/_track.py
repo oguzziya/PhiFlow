@@ -53,9 +53,13 @@ class SparseLinearOperation(AbstractTensor):
         else:
             other = self._tensor(other)
             broadcast_shape = combined_shape(self, other)
-            flat = math.flatten(other.native(broadcast_shape.names))
-            vertical = math.expand_dims(flat, -1)
-            new_matrix = native_function(self.dependency_matrix, vertical)
+            if other.shape.volume > 1:
+                flat = math.flatten(other.native(broadcast_shape.names))
+                vertical = math.expand_dims(flat, -1)
+                new_matrix = native_function(self.dependency_matrix, vertical)  # this can cause matrix to become dense...
+            else:
+                scalar = other[{dim: 0 for dim in other.shape.names}].native()
+                new_matrix = native_function(self.dependency_matrix, scalar)
             return SparseLinearOperation(self.source, new_matrix, broadcast_shape)
 
 
@@ -93,5 +97,5 @@ def sum_operators(operators):
     for o in operators[1:]:
         assert isinstance(o, SparseLinearOperation)
         assert o.source is operators[0].source
-    new_matrix = math.sum([o.dependency_matrix for o in operators])
+    new_matrix = math.sum([o.dependency_matrix for o in operators], axis=0)
     return SparseLinearOperation(operators[0].source, new_matrix, operators[0].shape)
