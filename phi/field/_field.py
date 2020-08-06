@@ -120,6 +120,9 @@ class Field:
     def __le__(self, other):
         return self._op2(other, lambda x, y: x <= y)
 
+    def __abs__(self):
+        return self._op1(lambda x: abs(x))
+
     def _op1(self, operator):
         """
         Perform an operation on the data of this field.
