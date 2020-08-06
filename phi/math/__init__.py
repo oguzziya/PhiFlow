@@ -1,16 +1,15 @@
 from .backend import DYNAMIC_BACKEND, extrapolation
-from .backend.scipy_backend import SCIPY_BACKEND
+from .backend._scipy_backend import SCIPY_BACKEND
 
 from phi.struct.struct_backend import StructBroadcastBackend
 
 from ._shape import Shape, define_shape, spatial_shape, infer_shape
 from ._tensors import tensor, AbstractTensor, combined_shape
-from ._tensor_initializers import zeros, fftfreq, random_normal
 from ._tensor_math import (
     is_tensor, as_tensor,
     copy,
     transpose,
-    meshgrid,
+    zeros, ones, fftfreq, random_normal, meshgrid,  # creation operators (use default backend)
     batch_stack, spatial_stack, channel_stack,
     concat,
     pad, spatial_pad,
@@ -63,7 +62,6 @@ from ._nd import (
 )
 
 # Setup Backend
-DYNAMIC_BACKEND.add_backend(SCIPY_BACKEND)
 DYNAMIC_BACKEND.add_backend(StructBroadcastBackend(DYNAMIC_BACKEND))
 
 choose_backend = DYNAMIC_BACKEND.choose_backend

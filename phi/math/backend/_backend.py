@@ -169,7 +169,13 @@ class Backend:
     def range(self, start, limit=None, delta=1, dtype=None):
         raise NotImplementedError(self)
 
+    def zeros(self, shape, dtype=None):
+        raise NotImplementedError(self)
+
     def zeros_like(self, tensor):
+        raise NotImplementedError(self)
+
+    def ones(self, shape, dtype=None):
         raise NotImplementedError(self)
 
     def ones_like(self, tensor):

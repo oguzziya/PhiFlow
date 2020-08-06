@@ -4,7 +4,6 @@ import warnings
 import numpy as np
 
 from .backend import math as native_math
-from .. import math
 from ._shape import Shape, infer_shape, CHANNEL_DIM, BATCH_DIM, SPATIAL_DIM, EMPTY_SHAPE
 
 

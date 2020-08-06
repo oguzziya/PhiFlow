@@ -135,8 +135,14 @@ class SciPyBackend(Backend):
         assert result.shape == shape_out, "returned value has wrong shape: {}, expected {}".format(result.shape, shape_out)
         return result
 
+    def zeros(self, shape, dtype=None):
+        return np.zeros(shape, dtype=dtype or self.float_type)
+
     def zeros_like(self, tensor):
         return np.zeros_like(tensor)
+
+    def ones(self, shape, dtype=None):
+        return np.ones(shape, dtype=dtype or self.float_type)
 
     def ones_like(self, tensor):
         return np.ones_like(tensor)

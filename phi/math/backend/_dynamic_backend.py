@@ -27,7 +27,7 @@ class DynamicBackend(Backend):
         for backend in self.backends:
             backend.precision = precision
 
-    def choose_backend(self, values: list) -> Backend:
+    def choose_backend(self, values: list or tuple, creation=False) -> Backend:
         if not isinstance(values, (list, tuple)):
             values = [values]
 
@@ -38,7 +38,7 @@ class DynamicBackend(Backend):
             return True
 
         # --- Default Backend has priority ---
-        if self.default_backend is not None and applicable(self.default_backend):
+        if creation and self.default_backend is not None and applicable(self.default_backend):
             return self.default_backend
         # --- Filter out non-applicable ---
         backends = list(backend for backend in self.backends if applicable(backend))
@@ -129,16 +129,22 @@ class DynamicBackend(Backend):
         return self.choose_backend([inputs, sample_coords]).resample(inputs, sample_coords, interpolation=interpolation, boundary=boundary)
 
     def range(self, start, limit=None, delta=1, dtype=None):
-        return self.choose_backend([start, limit, delta]).range(start, limit, delta, dtype)
+        return self.choose_backend([start, limit, delta], creation=True).range(start, limit, delta, dtype)
+
+    def zeros(self, shape, dtype=None):
+        return self.choose_backend([], creation=True).zeros(shape, dtype)
 
     def zeros_like(self, tensor):
-        return self.choose_backend(tensor).zeros_like(tensor)
+        return self.choose_backend(tensor, creation=True).zeros_like(tensor)
+
+    def ones(self, shape, dtype=None):
+        return self.choose_backend([], creation=True).zeros(shape, dtype)
 
     def ones_like(self, tensor):
-        return self.choose_backend(tensor).ones_like(tensor)
+        return self.choose_backend(tensor, creation=True).ones_like(tensor)
 
     def meshgrid(self, *coordinates):
-        return self.choose_backend(coordinates).meshgrid(*coordinates)
+        return self.choose_backend(coordinates, creation=True).meshgrid(*coordinates)
 
     def dot(self, a, b, axes):
         return self.choose_backend([a, b]).dot(a, b, axes)

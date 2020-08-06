@@ -331,9 +331,10 @@ class IncompatibleShapes(ValueError):
 
 def define_shape(channels=(), batch=None, infer_types_if_not_given=False, **spatial):
     """
+    Creates a shape from the specified channel, spatial and batch dimensions.
 
     :param channels: int or (int,)
-    :param batch: int or {name: int} or (Dimension,)
+    :param batch: int or {name: size}
     :param infer_types_if_not_given: if True, detects legacy-style shapes, infers the corresponding types and removes singleton dimensions
     :param spatial:
     :return:

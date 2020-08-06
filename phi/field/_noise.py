@@ -2,11 +2,7 @@ import numpy as np
 
 from phi import math
 from phi.geom import GridCell
-from phi.math._tensor_initializers import random_normal
-
-from ._grid import CenteredGrid
-from ._staggered_grid import StaggeredGrid
-from ._field import Field
+from phi.math import random_normal
 from ._analytic import AnalyticField
 
 

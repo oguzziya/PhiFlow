@@ -6,7 +6,7 @@ import numpy as np
 import tensorflow as tf
 
 from phi.math.backend import Backend, split_multi_mode_pad, PadSettings, general_grid_sample_nd, circular_pad, replicate_pad, extrapolation
-from phi.math.backend.scipy_backend import SCIPY_BACKEND, SciPyBackend
+from phi.math.backend._scipy_backend import SCIPY_BACKEND, SciPyBackend
 from .tf_cuda_resample import resample_cuda, use_cuda
 
 
@@ -151,8 +151,14 @@ class TFBackend(Backend):
         else:
             return Backend.resample(self, inputs, sample_coords, interpolation, boundary)
 
+    def zeros(self, shape, dtype=None):
+        return tf.zeros(shape, dtype=dtype or self.float_type)
+
     def zeros_like(self, tensor):
         return tf.zeros_like(tensor)
+
+    def ones(self, shape, dtype=None):
+        return tf.ones(shape, dtype=dtype or self.float_type)
 
     def ones_like(self, tensor):
         return tf.ones_like(tensor)
