@@ -87,9 +87,9 @@ class AbstractTensor:
             content = list(np.reshape(content, [-1]))
             content = ', '.join([repr(number) for number in content])
             if self.rank == 1:
-                return "[%s  %s]" % (content.dtype, content)
+                return "[%s  %s]" % (dtype, content)
             else:
-                return "[%s, %s:  %s]" % (content.dtype, self.shape, content)
+                return "[%s, %s:  %s]" % (dtype, self.shape, content)
         else:
             min_, max_ = np.min(content), np.max(content)
             return "[%s, %s  %s < ... < %s]" % (content.dtype, self.shape, min_, max_)
@@ -374,7 +374,7 @@ class NativeTensor(AbstractTensor):
         for name in order:
             if name not in self.shape:
                 tensor = native_math.expand_dims(tensor, axis=-1)
-                shape = shape.plus(1, name, CHANNEL_DIM, pos=-1)
+                shape = shape.expand(1, name, CHANNEL_DIM, pos=-1)
         # --- Transpose ---
         perm = shape.perm(order)
         tensor = native_math.transpose(tensor, perm)
@@ -489,7 +489,7 @@ class TensorStack(AbstractTensor):
         self.stack_dim_name = dim_name
         self.stack_dim_type = dim_type
         self.keep_separate = keep_separate
-        self._shape = combined_shape(*self.tensors, allow_inconsistencies=keep_separate).plus(len(tensors), dim_name, dim_type, pos=None)
+        self._shape = combined_shape(*self.tensors, allow_inconsistencies=keep_separate).expand(len(tensors), dim_name, dim_type, pos=None)
         self._cached = None
 
     def _cache(self):

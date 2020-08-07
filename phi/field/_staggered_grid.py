@@ -19,7 +19,7 @@ class StaggeredGrid(Grid):
         assert isinstance(data, TensorStack)
         self._data = data
         x = self._data[0 if GLOBAL_AXIS_ORDER.is_x_first else -1]
-        self._shape = x.shape.with_size('x', x.shape.get_size('x') - 1).plus(x.rank, 0, CHANNEL_DIM)
+        self._shape = x.shape.with_size('x', x.shape.get_size('x') - 1).expand(x.rank, 0, CHANNEL_DIM)
         Grid.__init__(self, self.resolution, box, extrapolation)
         assert_same_rank(self._data.shape.get_size(0), self.box, 'StaggeredGrid.data does not match box.')
 

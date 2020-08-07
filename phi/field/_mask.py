@@ -24,6 +24,3 @@ class GeometryMask(AnalyticField):
             return self.geometry.approximate_fraction_inside(points)
         else:
             return math.to_float(self.geometry.lies_inside(points))
-
-
-mask = GeometryMask

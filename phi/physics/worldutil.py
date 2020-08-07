@@ -1,7 +1,7 @@
 """ High-level world utility and convenience functions. """
 from phi.geom import union
 from .world import StateProxy, World
-from phi.field._mask import mask
+from phi.field import GeometryMask
 
 
 def obstacle_mask(world_or_proxy, **mask_kwargs):

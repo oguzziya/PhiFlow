@@ -484,7 +484,7 @@ def tile(value, multiples):
 
 def expand_channel(x, dim_size, dim_name):
     x = tensor(x)
-    shape = x.shape.plus(dim_size, dim_name, CHANNEL_DIM)
+    shape = x.shape.expand(dim_size, dim_name, CHANNEL_DIM)
     return CollapsedTensor(x, shape)
 
 
@@ -561,17 +561,17 @@ def _assert_close(tensor1, tensor2, rel_tolerance=1e-5, abs_tolerance=0):
         np.testing.assert_allclose(np1, np2, rel_tolerance, abs_tolerance)
 
 
-def conjugate_gradient(A, y, x0, relative_tolerance: float = 1e-5, absolute_tolerance: float = 0.0, max_iterations: int = 1000, gradient: str = 'implicit', callback=None):
+def conjugate_gradient(operator, y, x0, relative_tolerance: float = 1e-5, absolute_tolerance: float = 0.0, max_iterations: int = 1000, gradient: str = 'implicit', callback=None):
     x0, y = tensor(x0, y)
     batch = combined_shape(y, x0).batch
     x0_native = math.reshape(x0.native(), (x0.shape.batch.volume, x0.shape.non_batch.volume))
     y_native = math.reshape(y.native(), (y.shape.batch.volume, y.shape.non_batch.volume))
-    if callable(A):
+    if callable(operator):
         build_time = time.time()
         x_track = as_sparse_linear_operation(x0)
         A_ = None
         try:
-            Ax_track = A(x_track)
+            Ax_track = operator(x_track)
             if isinstance(Ax_track, SparseLinearOperation):
                 A_ = Ax_track.dependency_matrix
                 print("CG: matrix build time: %s" % (time.time() - build_time))
@@ -584,11 +584,11 @@ def conjugate_gradient(A, y, x0, relative_tolerance: float = 1e-5, absolute_tole
             def A_(native_x):
                 x = math.reshape(native_x, x0.shape.non_batch.sizes)
                 x = NativeTensor(x, x0.shape.non_batch)
-                Ax = A(x)
+                Ax = operator(x)
                 Ax_native = math.reshape(Ax.native(), math.shape(native_x))
                 return Ax_native
     else:
-        A_ = math.reshape(A.native(), (y.shape.non_batch.volume, x0.shape.non_batch.volume))
+        A_ = math.reshape(operator.native(), (y.shape.non_batch.volume, x0.shape.non_batch.volume))
 
     cg_time = time.time()
     converged, x, iterations = math.conjugate_gradient(A_, y_native, x0_native, relative_tolerance, absolute_tolerance, max_iterations, gradient, callback)

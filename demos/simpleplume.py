@@ -1,4 +1,5 @@
-from phi.tf.flow import *
+from phi.flow import *
+
 
 domain = Domain([64, 80], boundaries=CLOSED, box=box[0:100, 0:100])
 dt = 1.0
@@ -6,7 +7,7 @@ buoyancy_factor = 0.1
 
 velocity = domain.grid(0, StaggeredGrid)
 density = domain.grid(0)
-inflow = mask(Sphere(center=(50, 10), radius=5)).sample_at(density.elements) * 0.2
+inflow = GeometryMask(Sphere(center=(50, 10), radius=5)).sample_at(density.elements) * 0.2
 divergence = domain.grid(0)
 
 
@@ -28,6 +29,6 @@ app.add_field('Divergence', lambda: divergence)
 app.step = step
 show(app)
 
-# while True:
+while True:
 
-    # app.update({'velocity': velocity, 'density': density})
+    app.update({'velocity': velocity, 'density': density})

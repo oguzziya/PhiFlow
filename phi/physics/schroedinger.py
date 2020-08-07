@@ -3,7 +3,7 @@ from phi import math, struct
 
 from . import Physics, StateDependency
 from .domain import DomainState
-from phi.field import AnalyticField, GeometryMask, mask
+from phi.field import AnalyticField, GeometryMask
 from .effect import ADD, FieldEffect, effect_applied
 from ..geom import union
 
@@ -63,7 +63,7 @@ class Schroedinger(Physics):
         amplitude_fft *= math.exp(-1j * (2 * np.pi)**2 * math.to_complex(dt) * laplace / (2 * state.mass))
         amplitude = math.ifft(amplitude_fft)
 
-        obstacle_mask = mask(union([obstacle.geometry for obstacle in obstacles])).at(state.amplitude).data
+        obstacle_mask = GeometryMask(union([obstacle.geometry for obstacle in obstacles])).at(state.amplitude).data
         amplitude *= 1 - obstacle_mask
 
         normalized = False

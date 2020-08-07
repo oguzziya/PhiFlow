@@ -10,7 +10,7 @@ class GeometryStack(Geometry):
         for geometry in geometries:
             assert isinstance(geometry, Geometry)
             self._shape = self._shape.combined(geometry.shape, allow_inconsistencies=True)
-        self._shape = self._shape.plus(len(geometries), dim_name, BATCH_DIM, pos=0)
+        self._shape = self._shape.expand(len(geometries), dim_name, BATCH_DIM, pos=0)
         self.geometries = tuple(geometries)
         self.stack_dim_name = dim_name
 

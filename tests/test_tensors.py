@@ -131,7 +131,7 @@ class TestTensors(TestCase):
     def test_semi_collapsed(self):
         physics_config.x_first()
         scalar = tensor(np.ones([1, 4, 3, 1]))
-        scalar = CollapsedTensor(scalar, scalar.shape.plus(10, 'batch', BATCH_DIM))
+        scalar = CollapsedTensor(scalar, scalar.shape.expand(10, 'batch', BATCH_DIM))
         self.assertEqual('(batch=10, x=4, y=3)', repr(scalar.shape))
         self.assertEqual(4, len(scalar.x.unstack()))
         self.assertEqual(10, len(scalar.batch.unstack()))

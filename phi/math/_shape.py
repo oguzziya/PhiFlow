@@ -205,7 +205,7 @@ class Shape:
     def __and__(self, other):
         return self.combined(other)
 
-    def plus(self, size, name, dim_type, pos=None):
+    def expand(self, size, name, dim_type, pos=None):
         """
         Add a dimension to the shape.
 
@@ -238,6 +238,8 @@ class Shape:
             return EMPTY_SHAPE
         else:
             raise ValueError(other)
+
+    reduce = without
 
     @property
     def rank(self):

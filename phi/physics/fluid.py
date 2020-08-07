@@ -6,7 +6,7 @@ from functools import partial
 import numpy as np
 
 from phi import math, struct, field
-from phi.field import mask, AngularVelocity, CenteredGrid, Grid
+from phi.field import GeometryMask, AngularVelocity, CenteredGrid, Grid
 from phi.geom import union, GridCell
 from . import advect
 from .domain import Domain, DomainState
@@ -25,7 +25,7 @@ Projects the given velocity field by solving for and subtracting the pressure.
     :param obstacles: list of Obstacles
     :return: divergence-free velocity as StaggeredGrid
     """
-    obstacle_mask = mask(union([obstacle.geometry for obstacle in obstacles]))
+    obstacle_mask = GeometryMask(union([obstacle.geometry for obstacle in obstacles]))
     active_mask = 1 - obstacle_mask.sample_at(GridCell(velocity.resolution, velocity.box).center)
     active_mask = CenteredGrid(active_mask, velocity.box, math.extrapolation.ZERO)
     active_extrapolation = math.extrapolation.PERIODIC if domain.boundaries == math.extrapolation.PERIODIC else math.extrapolation.ZERO
@@ -35,7 +35,7 @@ Projects the given velocity field by solving for and subtracting the pressure.
     velocity *= hard_bcs
     for obstacle in obstacles:
         if not obstacle.is_stationary:
-            obs_mask = mask(obstacle.geometry)
+            obs_mask = GeometryMask(obstacle.geometry)
             angular_velocity = AngularVelocity(location=obstacle.geometry.center, strength=obstacle.angular_velocity, falloff=None)
             velocity = ((1 - obs_mask) * velocity + obs_mask * (angular_velocity + obstacle.velocity)).at(velocity)
     # --- Pressure solve ---
