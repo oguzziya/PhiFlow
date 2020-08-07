@@ -1,10 +1,10 @@
-from phi.tf.flow import *
+from phi.flow import *
 
 domain = Domain([64, 64], boundaries=PERIODIC, box=box[0:100, 0:100])
 # velocity = domain.vec_grid(Noise((2,))) * 2
 # velocity = domain.vec_grid(Noise((2,)), type=StaggeredGrid) * 2
 
-velocity = domain.vec_grid(mask(Sphere([50, 50], radius=15)), StaggeredGrid) * [2, 0] + [1, 0]
+velocity = domain.vec_grid(GeometryMask(Sphere([50, 50], radius=15)), StaggeredGrid) * [2, 0] + [1, 0]
 assert velocity.shape.channel.volume == 2
 
 

@@ -14,7 +14,7 @@ divergence = domain.grid(0)
 def step():
     global velocity, density, divergence
     density = advect.semi_lagrangian(density, velocity, dt) + inflow
-    velocity = advect.semi_lagrangian(velocity, velocity, dt) + resample(density * (0, buoyancy_factor), velocity)
+    velocity = advect.semi_lagrangian(velocity, velocity, dt) + (density * (0, buoyancy_factor)).at(velocity)
     velocity = divergence_free(velocity, domain)
     divergence = field.divergence(velocity)
 
@@ -29,6 +29,6 @@ app.add_field('Divergence', lambda: divergence)
 app.step = step
 show(app)
 
-while True:
-
-    app.update({'velocity': velocity, 'density': density})
+# while True:
+#
+#     app.update({'velocity': velocity, 'density': density})

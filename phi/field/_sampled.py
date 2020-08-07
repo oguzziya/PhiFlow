@@ -10,7 +10,7 @@ from ._staggered_grid import StaggeredGrid, unstack_staggered_tensor
 from ._util import extrapolate
 
 
-class SampledField(Field):
+class ArbitrarilySampledField(Field):
 
     def __init__(self, sample_points, data=1, mode='mean', point_count=None, **kwargs):
         Field.__init__(self, **struct.kwargs(locals(), ignore=['point_count']))

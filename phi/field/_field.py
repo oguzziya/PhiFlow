@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+from abc import ABC
+
 from phi import math
 from phi.geom import Geometry
 from phi.math import Shape, AbstractTensor
+from phi.math.backend import Extrapolation
 
 
 class Field:
@@ -51,6 +54,12 @@ class Field:
         """
         # * **Field**. The values of that field are interpreted as the sample locations. Analytic fields cannot be used.
         raise NotImplementedError(self)
+
+    def at(self, representation: SampledField) -> SampledField:
+        elements = representation.elements
+        resampled = self.sample_at(elements, reduce_channels=elements.shape.non_channel.without(representation.shape).names)
+        extrap = self.extrapolation if isinstance(self, SampledField) else representation.extrapolation
+        return representation._op1(lambda old: extrap if isinstance(old, math.extrapolation.Extrapolation) else resampled)
 
     def unstack(self, dimension=0) -> tuple:
         """
@@ -118,7 +127,7 @@ class Field:
         raise NotImplementedError()
 
 
-class SampledField(Field):
+class SampledField(Field, ABC):
 
     @property
     def elements(self) -> Geometry:
@@ -143,6 +152,10 @@ class SampledField(Field):
         raise NotImplementedError()
 
     def with_data(self, data: AbstractTensor):
+        raise NotImplementedError()
+
+    @property
+    def extrapolation(self) -> Extrapolation:
         raise NotImplementedError()
 
 

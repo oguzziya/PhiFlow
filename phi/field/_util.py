@@ -5,14 +5,7 @@ import numpy as np
 from phi import math
 from phi.geom import AABox
 from phi.field import StaggeredGrid, ConstantField, Grid, CenteredGrid
-from ._field import Field
-
-
-def resample(data: Field, representation: Grid):
-    elements = representation.elements
-    resampled = data.sample_at(elements, reduce_channels=elements.shape.non_channel.without(representation.shape).names)
-    extrap = data.extrapolation if isinstance(data, Grid) else representation.extrapolation
-    return representation._op1(lambda old: extrap if isinstance(old, math.extrapolation.Extrapolation) else resampled)
+from ._field import Field, SampledField
 
 
 def expose_tensors(field_function, *proto_fields):
@@ -36,16 +29,10 @@ def conjugate_gradient(function, y: Grid, x0: Grid, relative_tolerance: float = 
     return converged, x0.with_data(x), iterations
 
 
-def data_bounds(field):
-    assert field.has_points
-    try:
-        data = field.points.data
-        min_vec = math.min(data, axis=tuple(range(len(data.shape)-1)))
-        max_vec = math.max(data, axis=tuple(range(len(data.shape)-1)))
-    except StaggeredSamplePoints:
-        boxes = [data_bounds(c) for c in field.unstack()]
-        min_vec = math.min([b.lower for b in boxes], axis=0)
-        max_vec = math.max([b.upper for b in boxes], axis=0)
+def data_bounds(field: SampledField):
+    data = field.points
+    min_vec = math.min(data, axis=data.shape.spatial.names)
+    max_vec = math.max(data, axis=data.shape.spatial.names)
     return AABox(min_vec, max_vec)
 
 

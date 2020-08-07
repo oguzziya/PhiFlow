@@ -6,13 +6,13 @@ from phi import math
 from phi.geom import AABox, GridCell, Geometry
 from phi.geom import assert_same_rank
 from phi.struct.functions import mappable
-from ._field import Field
+from ._field import Field, SampledField
 from phi.math.backend.tensorop import collapse
 from phi.math.backend import Extrapolation, general_grid_sample_nd
 from ..math import Shape, tensor, AbstractTensor
 
 
-class Grid(Field, ABC):
+class Grid(SampledField, ABC):
 
     def __init__(self, resolution, box, extrapolation=math.extrapolation.ZERO):
         assert isinstance(extrapolation, (Extrapolation, tuple, list)), extrapolation
