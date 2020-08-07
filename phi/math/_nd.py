@@ -135,6 +135,10 @@ def abs_square(complex):
 #     return math.sum(components, 0)
 
 
+def offset(x: AbstractTensor, axes: tuple, offsets: tuple, padding=extrapolation.BOUNDARY, stack_name='offset'):
+    pass
+
+
 # Gradient
 
 def gradient(tensor, dx=1, difference='central', padding=extrapolation.BOUNDARY, axes=None):

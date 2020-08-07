@@ -35,13 +35,6 @@ class Grid(Field, ABC):
     def extrapolation(self) -> Extrapolation:
         return self._extrapolation
 
-    @property
-    def data(self) -> AbstractTensor:
-        raise NotImplementedError()
-
-    def with_data(self, data: AbstractTensor):
-        raise NotImplementedError()
-
 
 class CenteredGrid(Grid):
 

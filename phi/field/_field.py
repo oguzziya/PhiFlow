@@ -8,24 +8,6 @@ from phi.math import Shape, AbstractTensor
 class Field:
 
     @property
-    def elements(self) -> Geometry:
-        """
-        Returns a geometrical representation of the discretized volume elements.
-        The result is a tuple of Geometry objects, each of which can have additional spatial (but not batch) dimensions.
-
-        For grids, the geometries are boxes while particle fields may be represented as spheres.
-
-        If this Field has no discrete points, this method returns an empty geometry.
-
-        :return: Geometry with all batch/spatial dimensions of this Field. Staggered sample points are modelled using extra batch dimensions.
-        """
-        raise NotImplementedError(self)
-
-    @property
-    def points(self) -> AbstractTensor:
-        return self.elements.center
-
-    @property
     def shape(self) -> Shape:
         """
         Returns a shape with the following properties
@@ -123,7 +105,7 @@ class Field:
     def __abs__(self):
         return self._op1(lambda x: abs(x))
 
-    def _op1(self, operator):
+    def _op1(self, operator) -> Field:
         """
         Perform an operation on the data of this field.
 
@@ -132,7 +114,35 @@ class Field:
         """
         raise NotImplementedError()
 
-    def _op2(self, other, operator):
+    def _op2(self, other, operator) -> Field:
+        raise NotImplementedError()
+
+
+class SampledField(Field):
+
+    @property
+    def elements(self) -> Geometry:
+        """
+        Returns a geometrical representation of the discretized volume elements.
+        The result is a tuple of Geometry objects, each of which can have additional spatial (but not batch) dimensions.
+
+        For grids, the geometries are boxes while particle fields may be represented as spheres.
+
+        If this Field has no discrete points, this method returns an empty geometry.
+
+        :return: Geometry with all batch/spatial dimensions of this Field. Staggered sample points are modelled using extra batch dimensions.
+        """
+        raise NotImplementedError(self)
+
+    @property
+    def points(self) -> AbstractTensor:
+        return self.elements.center
+
+    @property
+    def data(self) -> AbstractTensor:
+        raise NotImplementedError()
+
+    def with_data(self, data: AbstractTensor):
         raise NotImplementedError()
 
 

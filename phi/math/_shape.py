@@ -61,6 +61,11 @@ class Shape:
         else:
             raise ValueError(name)
 
+    def __getattr__(self, name):
+        if name in self.names:
+            return self.get_size(name)
+        raise AttributeError("%s has no attribute '%s'" % (self, name))
+
     def get_type(self, name):
         return self.types[self.names.index(name)]
 
@@ -345,7 +350,7 @@ def define_shape(channels=(), batch=None, infer_types_if_not_given=False, **spat
         assert batch is None
         assert len(spatial) == 0
         return channels
-    if infer_types_if_not_given and batch is None and len(spatial) == 0 and len(channels) >= 3:
+    if infer_types_if_not_given and batch is None and len(spatial) == 0 and isinstance(channels, (tuple, list)) and len(channels) >= 3:
         shape = infer_shape(channels)
         return shape.without(shape.non_spatial.singleton)
     sizes = []
