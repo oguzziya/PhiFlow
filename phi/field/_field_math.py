@@ -19,6 +19,11 @@ def gradient(field: Grid, axes=None, difference='central'):
         raise NotImplementedError('Only cubic cells supported.')
 
 
+def shift(grid: CenteredGrid, offsets: tuple, stack_dim='shift'):
+    data = math.shift(grid.data, offsets, padding=grid.extrapolation, stack_dim=stack_dim)
+    return [CenteredGrid(data[i], grid.box, grid.extrapolation) for i in range(len(offsets))]
+
+
 def staggered_gradient(field: CenteredGrid):
     return stagger(field, lambda lower, upper: (upper - lower) / field.dx)
 
@@ -29,16 +34,16 @@ def stagger(field: CenteredGrid, face_function=math.minimum):
     for dim in field.shape.spatial.names:
         all_upper.append(math.pad(field.data, {dim: (0, 1)}, field.extrapolation))
         all_lower.append(math.pad(field.data, {dim: (1, 0)}, field.extrapolation))
-    all_upper = math.channel_stack(all_upper)
-    all_lower = math.channel_stack(all_lower)
+    all_upper = math.channel_stack(all_upper, 'vector')
+    all_lower = math.channel_stack(all_lower, 'vector')
     result = face_function(all_lower, all_upper)
     return result
 
 
 def divergence(field: StaggeredGrid):
     components = []
-    for i, dim in field.shape.spatial.enumerated_names:
-        div_dim = math.gradient(field.data[i], dx=field.dx[i], difference='forward', padding=None, axes=[dim])[0]
+    for i, dim in enumerate(field.shape.spatial.names):
+        div_dim = math.gradient(field.data.vector[i], dx=field.dx[i], difference='forward', padding=None, axes=[dim]).gradient[0]
         components.append(div_dim)
     data = math.sum(components, 0)
     return CenteredGrid(data, field.box, field.extrapolation.gradient())

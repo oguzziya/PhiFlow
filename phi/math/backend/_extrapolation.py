@@ -1,3 +1,4 @@
+from __future__ import annotations
 
 class IncompatibleExtrapolations(ValueError):
     def __init__(self, extrapolation1, extrapolation2):
@@ -6,7 +7,7 @@ class IncompatibleExtrapolations(ValueError):
 
 class Extrapolation:
 
-    def gradient(self):
+    def gradient(self) -> Extrapolation:
         """
         Returns the extrapolation for the spatial gradient of a tensor/field with this extrapolation.
 

@@ -95,24 +95,30 @@ def meshgrid(*coordinates):
     indices_list = math.meshgrid(*coordinates)
     single_shape = spatial_shape([len(coo) for coo in coordinates])
     channels = [NativeTensor(t, single_shape) for t in indices_list]
-    return TensorStack(channels, 0, CHANNEL_DIM)
+    return TensorStack(channels, 'vector', CHANNEL_DIM)
 
 
-def channel_stack(values, axis=0):
+def channel_stack(values, axis='channel'):
+    assert isinstance(axis, str)
     return _stack(values, axis, CHANNEL_DIM)
 
 
 def batch_stack(values, axis='batch'):
+    assert isinstance(axis, str)
     return _stack(values, axis, BATCH_DIM)
 
 
 def spatial_stack(values, axis='x'):
+    assert isinstance(axis, str)
     return _stack(values, axis, SPATIAL_DIM)
 
 
 def _stack(values, dim, dim_type):
     def inner_stack(*values):
-        return TensorStack(values, dim, dim_type, keep_separate='auto')
+        varying_shapes = any_([v.shape != values[0].shape for v in values[1:]])
+        tracking = any_([isinstance(v, SparseLinearOperation) for v in values])
+        inner_keep_separate = any_([isinstance(v, TensorStack) and v.keep_separate for v in values])
+        return TensorStack(values, dim, dim_type, keep_separate=varying_shapes or tracking or inner_keep_separate)
 
     result = broadcast_op(inner_stack, values)
     return result
@@ -138,7 +144,6 @@ def pad(value, pad_width: dict, mode=extrapolation.ZERO):
     :return:
     """
     value = tensor(value)
-    assert isinstance(pad_width, dict)
     if isinstance(value, NativeTensor):
         native = value.tensor
         ordered_pad_widths = value.shape.order(pad_width, default=0)
@@ -147,18 +152,27 @@ def pad(value, pad_width: dict, mode=extrapolation.ZERO):
         new_shape = value.shape.with_sizes(math.staticshape(result_tensor))
         return NativeTensor(result_tensor, new_shape)
     elif isinstance(value, CollapsedTensor):
-        inner = pad(value.tensor, pad_width, mode=mode)
+        inner = value.tensor
+        inner_widths = {dim: w for dim, w in pad_width.items() if dim in inner.shape}
+        if len(inner_widths) > 0:
+            inner = pad(inner, pad_width, mode=mode)
         new_sizes = []
         for size, dim, dim_type in value.shape.dimensions:
             if dim not in pad_width:
                 new_sizes.append(size)
             else:
                 delta = sum(pad_width[dim]) if isinstance(pad_width[dim], (tuple, list)) else 2 * pad_width[dim]
-                new_sizes.append(size + delta)
+                new_sizes.append(size + int(delta))
         new_shape = value.shape.with_sizes(new_sizes)
         return CollapsedTensor(inner, new_shape)
     elif isinstance(value, SparseLinearOperation):
         return pad_operator(value, pad_width, mode)
+    elif isinstance(value, TensorStack):
+        if not value.requires_broadcast:
+            return pad(value._cache())
+        inner_widths = {dim: w for dim, w in pad_width.items() if dim != value.stack_dim_name}
+        tensors = [pad(t, inner_widths, mode) for t in value.tensors]
+        return TensorStack(tensors, value.stack_dim_name, value.stack_dim_type, value.keep_separate)
     else:
         raise NotImplementedError()
 
@@ -264,7 +278,7 @@ def sum(value: AbstractTensor or list or tuple, axis=None):
             result = math.sum(natives, axis=0)
             return NativeTensor(result, sums[0].shape)
         else:
-            TensorStack(sums, value.stack_dim_name, value.stack_dim_type, keep_separate=value.keep_separate)
+            return TensorStack(sums, value.stack_dim_name, value.stack_dim_type, keep_separate=value.keep_separate)
     else:
         raise NotImplementedError()
 

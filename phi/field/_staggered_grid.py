@@ -18,10 +18,10 @@ class StaggeredGrid(Grid):
     def __init__(self, data, box=None, extrapolation=math.extrapolation.ZERO):
         assert isinstance(data, TensorStack)
         self._data = data
-        x = self._data[0 if GLOBAL_AXIS_ORDER.is_x_first else -1]
-        self._shape = x.shape.with_size('x', x.shape.get_size('x') - 1).expand(x.rank, 0, CHANNEL_DIM)
+        x = self._data.vector[0 if GLOBAL_AXIS_ORDER.is_x_first else -1]
+        self._shape = x.shape.with_size('x', x.shape.get_size('x') - 1).expand(x.rank, 'vector', CHANNEL_DIM)
         Grid.__init__(self, self.resolution, box, extrapolation)
-        assert_same_rank(self._data.shape.get_size(0), self.box, 'StaggeredGrid.data does not match box.')
+        assert_same_rank(self._data.shape.get_size('vector'), self.box, 'StaggeredGrid.data does not match box.')
 
     @staticmethod
     def from_staggered_tensor(staggered_tensor, box, extrapolation=math.extrapolation.ZERO):
@@ -48,7 +48,7 @@ class StaggeredGrid(Grid):
                     comp_res, comp_box = extend_symmetric(resolution, box, dim)
                     comp_grid = CenteredGrid.sample(comp, comp_res, comp_box, extrapolation)
                     tensors.append(comp_grid.data)
-                return StaggeredGrid(math.channel_stack(tensors), box, extrapolation)
+                return StaggeredGrid(math.channel_stack(tensors, 'vector'), box, extrapolation)
         elif callable(value):
             x = CenteredGrid.getpoints(domain.box, domain.resolution).copied_with(extrapolation=Material.extrapolation_mode(domain.boundaries), name=name)
             value = value(x)
@@ -58,7 +58,7 @@ class StaggeredGrid(Grid):
             for dim in resolution.spatial.names:
                 comp_res, comp_box = extend_symmetric(resolution, box, dim)
                 tensors.append(math.zeros(comp_res) + value)
-            return StaggeredGrid(math.channel_stack(tensors), box, extrapolation)
+            return StaggeredGrid(math.channel_stack(tensors, 'vector'), box, extrapolation)
 
     @property
     def data(self):
@@ -84,7 +84,7 @@ class StaggeredGrid(Grid):
             assert len(reduce_channels) == 1
             points = points.unstack(reduce_channels[0])
             channels = [component.sample_at(p) for p, component in zip(points, self.unstack())]
-        return math.channel_stack(channels)
+        return math.channel_stack(channels, 'vector')
 
     # def _resample_to(self, representation: Field) -> Field:
     #     if isinstance(representation, StaggeredGrid) and representation.box == self.box and np.allclose(representation.resolution, self.resolution):
@@ -104,7 +104,7 @@ class StaggeredGrid(Grid):
     def unstack(self, dimension=0):
         if dimension == 0:
             result = []
-            for dim, data in zip(self.resolution.spatial.names, self._data.unstack()):
+            for dim, data in zip(self.resolution.spatial.names, self._data.vector.unstack()):
                 result.append(CenteredGrid(data, extend_symmetric(self.resolution, self.box, dim)[1], self.extrapolation))
             return tuple(result)
         else:

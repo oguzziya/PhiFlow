@@ -12,28 +12,26 @@ CHANNEL_DIM = 2
 
 class Shape:
 
-    def __init__(self, sizes, names, types):
+    def __init__(self, sizes: tuple or list, names: tuple or list, types: tuple or list):
         """
 
         :param sizes: list of dimension sizes
         :param names: list of dimension names, either strings (spatial, batch) or integers (channel)
         :param types: list of types, all values must be one of (CHANNEL_DIM, SPATIAL_DIM, BATCH_DIM)
         """
+        assert len(sizes) == len(names) == len(types), "sizes=%s, names=%s, types=%s" % (sizes, names, types)
         self.sizes = tuple(sizes)
         self.names = tuple(names)
+        assert all(isinstance(n, str) for n in names), names
         self.types = tuple(types)
 
     @property
     def named_sizes(self):
-        return {name: size for name, size in zip(self.names, self.sizes)}.items()
+        return zip(self.names, self.sizes)
 
     @property
     def dimensions(self):
         return zip(self.sizes, self.names, self.types)
-
-    @property
-    def enumerated_names(self):
-        return zip(range(len(self)), self.names)
 
     def __len__(self):
         return len(self.sizes)
@@ -64,7 +62,7 @@ class Shape:
     def __getattr__(self, name):
         if name in self.names:
             return self.get_size(name)
-        raise AttributeError("%s has no attribute '%s'" % (self, name))
+        raise AttributeError("Shape has no attribute '%s'" % (name,))
 
     def get_type(self, name):
         return self.types[self.names.index(name)]
@@ -121,11 +119,8 @@ class Shape:
         return self[indices]
 
     def __repr__(self):
-        strings = ['%s=%s' % (name, size) if isinstance(name, str) else '%d' % size for size, name, _ in self.dimensions]
+        strings = ['%s=%s' % (name, size) for size, name, _ in self.dimensions]
         return '(' + ', '.join(strings) + ')'
-
-    def __str__(self):
-        return repr(self)
 
     def __eq__(self, other):
         if not isinstance(other, Shape):
@@ -201,10 +196,13 @@ class Shape:
             sizes.extend(self.channel.sizes)
             names.extend(self.channel.names)
             types.extend(self.channel.types)
-            if set(self.channel.names) != set(other.channel.names):
-                raise IncompatibleShapes(self, other)
             for size, name, type in other.channel.dimensions:
-                _check(size, name)
+                if name not in names:
+                    names.append(name)
+                    sizes.append(size)
+                    types.append(type)
+                else:
+                    _check(size, name)
         return Shape(sizes, names, types)
 
     def __and__(self, other):
@@ -336,6 +334,29 @@ class IncompatibleShapes(ValueError):
         ValueError.__init__(self, shape1, shape2)
 
 
+def names(obj, count: int) -> tuple:
+    if isinstance(obj, str):
+        parts = obj.split(',')
+        result = []
+        for part in parts:
+            part = part.strip()
+            if part == '...':
+                result.extend([None] * (count - len(parts) - 1))
+            elif part == ':':
+                result.append(None)
+            else:
+                result.append(part)
+        assert len(result) == count
+        return tuple(result)
+    elif isinstance(obj, Shape):
+        assert len(obj) == count
+        return obj.names
+    elif isinstance(obj, (tuple, list)):
+        assert len(obj) == count
+        return tuple(obj)
+    raise ValueError(obj)
+
+
 def define_shape(channels=(), batch=None, infer_types_if_not_given=False, **spatial):
     """
     Creates a shape from the specified channel, spatial and batch dimensions.
@@ -378,17 +399,17 @@ def define_shape(channels=(), batch=None, infer_types_if_not_given=False, **spat
     # --- Channel dimensions ---
     if isinstance(channels, int):
         sizes.append(channels)
-        names.append(0)
+        names.append('vector' if channels == len(spatial) else 'channel')
         types.append(CHANNEL_DIM)
     else:
         for i, channel in enumerate(channels):
             sizes.append(channel)
-            names.append(i)
+            names.append('channel%d' % i)
             types.append(CHANNEL_DIM)
     return Shape(sizes, names, types)
 
 
-def infer_shape(shape, batch_dims=None, spatial_dims=None, channel_dims=None):
+def infer_shape(shape, dim_names=None, batch_dims=None, spatial_dims=None, channel_dims=None):
     if isinstance(shape, Shape):
         return shape
     shape = tuple(shape)
@@ -407,17 +428,35 @@ def infer_shape(shape, batch_dims=None, spatial_dims=None, channel_dims=None):
     # --- Construct shape ---
     from phi import geom
     types = [BATCH_DIM] * batch_dims + [SPATIAL_DIM] * spatial_dims + [CHANNEL_DIM] * channel_dims
-    names = []
-    if batch_dims >= 1:
-        names.append('batch')
-    for i in range(batch_dims - 1):
-        warnings.warn("infer_shape() detected more than 1 batch dimension. They will be named 'batch', 'batch2', ...")
-        names.append('batch %d' % (i+2,))
-    for i in range(spatial_dims):
-        names.append(geom.GLOBAL_AXIS_ORDER.axis_name(i, spatial_dims))
-    for i in range(channel_dims):
-        names.append(i)
-    return Shape(sizes=shape, names=names, types=types)
+    if dim_names is not None:
+        dim_names = names(dim_names, len(shape))
+    if dim_names is None or None in dim_names:
+        set_dim_names = dim_names
+        dim_names = []
+        # --- batch names ---
+        if batch_dims == 1:
+            dim_names.append('batch')
+        else:
+            for i in range(batch_dims):
+                dim_names.append('batch %d' % (i,))
+        # --- spatial names ---
+        for i in range(spatial_dims):
+            dim_names.append(geom.GLOBAL_AXIS_ORDER.axis_name(i, spatial_dims))
+        # --- channel names ---
+        if channel_dims == 0:
+            pass
+        elif channel_dims == 1 and shape[-1] == spatial_dims:
+            dim_names.append('vector')
+        elif channel_dims == 1:
+            dim_names.append('channel')
+        else:
+            for i in range(channel_dims):
+                dim_names.append('channel%d' % i)
+        if set_dim_names is not None:
+            for i, set_name in enumerate(set_dim_names):
+                if set_name is not None:
+                    dim_names[i] = set_name
+    return Shape(sizes=shape, names=dim_names, types=types)
 
 
 def _infer_dim_group_counts(rank, constraints: list):

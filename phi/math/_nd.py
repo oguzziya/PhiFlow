@@ -9,7 +9,7 @@ from phi import struct
 from .backend import Extrapolation, extrapolation
 from . import _tensor_math as math
 from ._shape import CHANNEL_DIM, spatial_shape, channel_shape
-from ._tensor_math import broadcast_op
+from ._tensor_math import broadcast_op, batch_stack, channel_stack
 from ._tensors import tensor, AbstractTensor, TensorStack, NativeTensor
 from ._helper import _get_pad_width, _contains_axis, _multi_roll
 
@@ -135,7 +135,7 @@ def abs_square(complex):
 #     return math.sum(components, 0)
 
 
-def offset(x: AbstractTensor, offsets: tuple, axes: tuple or None = None, padding: Extrapolation or None = extrapolation.BOUNDARY, stack_name='offset') -> AbstractTensor:
+def shift(x: AbstractTensor, offsets: tuple, axes: tuple or None = None, padding: Extrapolation or None = extrapolation.BOUNDARY, stack_dim='shift') -> list:
     x = tensor(x)
     axes = axes if axes is not None else x.shape.spatial.names
     pad_lower = max(0, -min(offsets))
@@ -144,12 +144,12 @@ def offset(x: AbstractTensor, offsets: tuple, axes: tuple or None = None, paddin
         x = math.pad(x, {axis: (pad_lower, pad_upper) for axis in axes}, mode=padding)
     offset_tensors = []
     for offset in offsets:
-        components = {}
+        components = []
         for dimension in axes:
-            slices = [slice(pad_lower + offset, -pad_upper + offset) if dim == dimension else slice(pad_lower, -pad_upper) for dim in axes]
-            slices = tuple([slice(sl.start, sl.stop if sl.stop < 0 else None) for sl in slices])  # replace stop=0 by stop=None
-            components[dimension] = x[slices]
-        offset_tensors.append(vector_stack(components))
+            slices = {dim: slice(pad_lower + offset, -pad_upper + offset) if dim == dimension else slice(pad_lower, -pad_upper) for dim in axes}
+            slices = {dim: slice(sl.start, sl.stop if sl.stop < 0 else None) for dim, sl in slices.items()}  # replace stop=0 by stop=None
+            components.append(x[slices])
+        offset_tensors.append(channel_stack(components, stack_dim))
     return offset_tensors
 
 
@@ -177,58 +177,32 @@ def gradient(tensor, dx=1, difference='central', padding=extrapolation.BOUNDARY,
         raise ValueError('Invalid difference type: {}. Can be CENTRAL or FORWARD'.format(difference))
 
 
-def _gradient_nd(x_, padding, relative_shifts, axes):
-    x = tensor(x_)
-    axes = axes if axes is not None else x.shape.spatial.names
-    if padding is not None:
-        x = math.pad(x, {axis: (-relative_shifts[0], relative_shifts[1]) for axis in axes}, mode=padding)
-    components = {}
-    for dimension in axes:
-        lower, upper = _multi_roll(x, dimension, relative_shifts, diminish_others=(-relative_shifts[0], relative_shifts[1]), names=axes)
-        components[dimension] = upper - lower
-    result = vector_stack(components)
-    if isinstance(x_, AbstractTensor):
-        return result
-    else:
-        return result.native()
-
-
-def vector_stack(tensor_dict):
-    shape = next(iter(tensor_dict.values())).shape
-    ordered_names = sorted(tensor_dict.keys(), key=lambda name: shape.index(name))
-    ordered_tensors = [tensor_dict[name] for name in ordered_names]
-    return TensorStack(ordered_tensors, dim_name=shape.channel.rank, dim_type=CHANNEL_DIM)
+def _gradient_nd(x, padding, relative_shifts, axes):
+    left, right = shift(tensor(x), relative_shifts, axes, padding, stack_dim='gradient')
+    return right - left
 
 
 # Laplace
 
-def laplace(tensor, dx=1, padding=extrapolation.BOUNDARY, axes=None):
+def laplace(x, dx=1, padding=extrapolation.BOUNDARY, axes=None):
     """
     Spatial Laplace operator as defined for scalar fields.
     If a vector field is passed, the laplace is computed component-wise.
 
-    :param tensor: n-dimensional field of shape (batch, spacial dimensions..., components)
+    :param x: n-dimensional field of shape (batch, spacial dimensions..., components)
+    :param dx: scalar or 1d tensor
     :param padding: extrapolation
     :type padding: Ex
     :param axes: The second derivative along these axes is summed over
     :type axes: list
     :return: tensor of same shape
     """
-    if isinstance(tensor, Extrapolation):
-        return tensor.gradient()
-    return broadcast_op(lambda t: _sliced_laplace_nd(t, dx, padding, axes), [tensor])
-
-
-def _sliced_laplace_nd(x_, dx, padding, axes=None):
-    x = tensor(x_)
-    axes = axes if axes is not None else x.shape.spatial.names
-    x = math.pad(x, {axis: (1, 1) for axis in axes}, mode=padding)
-    components = []
-    for axis in axes:
-        axis_dx = x.shape.spatial.sequence_get(dx, axis)
-        lower, center, upper = _multi_roll(x, axis, (-1, 0, 1), diminish_others=(1, 1), names=axes)
-        components.append((upper + lower - 2 * center) / axis_dx ** 2)
-    result = math.sum(components, 0)
+    dx = tensor(dx)
+    if isinstance(x, Extrapolation):
+        return x.gradient()
+    left, center, right = shift(tensor(x), (-1, 0, 1), axes, padding, stack_dim='_laplace')
+    result = (left + right - 2 * center) / tensor(dx, names='_laplace')
+    result = math.sum(result, '_laplace')
     return result
 
 
@@ -313,7 +287,7 @@ def interpolate_linear(tensor: AbstractTensor, start, size):
         tensor = tensor.dimension(dim)[int(sta):int(sta)+siz + (1 if sta != 0 else 0)]
     upper_weight = start % 1
     lower_weight = 1 - upper_weight
-    for i, dimension in tensor.shape.spatial.enumerated_names:
+    for i, dimension in enumerate(tensor.shape.spatial.names):
         if upper_weight[i] not in (0, 1):
             lower, upper = _multi_roll(tensor, dimension, (0, 1), names=tensor.shape.spatial.names)
             tensor = upper * upper_weight[i] + lower * lower_weight[i]

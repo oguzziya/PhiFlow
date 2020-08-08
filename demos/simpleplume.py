@@ -26,6 +26,7 @@ app = App('Simple Plume', framerate=10)
 app.add_field('Velocity', lambda: velocity)
 app.add_field('Density', lambda: density)
 app.add_field('Divergence', lambda: divergence)
+app.add_field('Inflow', lambda: inflow)
 app.step = step
 show(app)
 

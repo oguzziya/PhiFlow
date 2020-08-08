@@ -26,5 +26,6 @@ Otherwise, finite differencing is used to approximate the
         if isinstance(amount, Field):
             amount = amount.at(field)
         for i in range(substeps):
+            lap = laplace(field)
             field += amount / substeps * laplace(field)
         return field

@@ -1,7 +1,7 @@
 import numpy as np
 
 from .backend import DYNAMIC_BACKEND as math, Extrapolation, extrapolation
-from ._tensors import AbstractTensor, NativeTensor, combined_shape
+from ._tensors import AbstractTensor, NativeTensor, combined_shape, TensorStack
 
 
 class SparseLinearOperation(AbstractTensor):
@@ -37,7 +37,7 @@ class SparseLinearOperation(AbstractTensor):
         selected_deps = math.gather(self.dependency_matrix, (selected_indices_native, slice(None)))
         return SparseLinearOperation(self.source, selected_deps, selected_indices.shape)
 
-    def unstack(self, dimension=0):
+    def unstack(self, dimension):
         raise NotImplementedError()
 
     def _op1(self, native_function):
@@ -54,9 +54,17 @@ class SparseLinearOperation(AbstractTensor):
             other = self._tensor(other)
             broadcast_shape = combined_shape(self, other)
             if other.shape.volume > 1:
-                flat = math.flatten(other.native(broadcast_shape.names))
-                vertical = math.expand_dims(flat, -1)
-                new_matrix = native_function(self.dependency_matrix, vertical)  # this can cause matrix to become dense...
+                additional_dims = broadcast_shape.without(self._shape)
+                if len(additional_dims) == 0:
+                    flat = math.flatten(other.native(broadcast_shape.names))
+                    vertical = math.expand_dims(flat, -1)
+                    new_matrix = native_function(self.dependency_matrix, vertical)  # this can cause matrix to become dense...
+                elif len(additional_dims) == 1:
+                    others = other.unstack(additional_dims.names[0])
+                    results = [self._op2(o, native_function) for o in others]
+                    return TensorStack(results, additional_dims.names[0], additional_dims.types[0])
+                else:
+                    raise NotImplementedError()
             else:
                 scalar = other[{dim: 0 for dim in other.shape.names}].native()
                 new_matrix = native_function(self.dependency_matrix, scalar)
@@ -81,7 +89,7 @@ def pad_operator(tensor: SparseLinearOperation, pad_widths: dict, mode: Extrapol
         dx0, dx1 = pad_widths[tensor.shape.names[1]]
         padded_row = row + dy0 * (tensor.shape[1] + dx0 + dx1) + dx0 * (y + 1) + dx1 * y
         new_sizes = list(tensor.shape.sizes)
-        for i, dim in tensor.shape.enumerated_names:
+        for i, dim in enumerate(tensor.shape.names):
             new_sizes[i] += sum(pad_widths[dim])
         new_shape = tensor.shape.with_sizes(new_sizes)
         padded_matrix = math.sparse_tensor((padded_row, col), data, shape=(new_shape.volume, tensor.dependency_matrix.shape[1]))

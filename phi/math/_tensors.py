@@ -3,6 +3,7 @@ import warnings
 
 import numpy as np
 
+from . import _shape
 from .backend import math as native_math
 from ._shape import Shape, infer_shape, CHANNEL_DIM, BATCH_DIM, SPATIAL_DIM, EMPTY_SHAPE
 
@@ -83,11 +84,11 @@ class AbstractTensor:
             return "[%s  %s]" % (dtype, self.shape)
         if self.rank == 0:
             return str(content)
-        if self.shape.volume <= 4:
+        if self.shape.volume is not None and self.shape.volume <= 4:
             content = list(np.reshape(content, [-1]))
             content = ', '.join([repr(number) for number in content])
             if self.rank == 1:
-                return "[%s  %s]" % (dtype, content)
+                return "[%s (%s)  %s]" % (dtype, self.shape.names[0], content)
             else:
                 return "[%s, %s:  %s]" % (dtype, self.shape, content)
         else:
@@ -100,9 +101,9 @@ class AbstractTensor:
         return str(content)
 
     def __getitem__(self, item):
-        if isinstance(item, (slice, int)):  # Channel dimension
-            assert self.shape.channel.rank == 1
-            item = {0: item}
+        if isinstance(item, (int, slice)):
+            assert self.rank == 1
+            item = {self.shape.names[0]: item}
         if isinstance(item, (tuple, list)):
             if item[0] == Ellipsis:
                 assert len(item) - 1 == self.shape.channel.rank
@@ -128,7 +129,7 @@ class AbstractTensor:
     #     """
     #     raise NotImplementedError()
 
-    def unstack(self, dimension=0):
+    def unstack(self, dimension):
         """
         Splits this tensor along the specified dimension.
         The returned tensors have the same dimensions as this tensor save the unstacked dimension.
@@ -142,11 +143,8 @@ class AbstractTensor:
     def dimension(self, name):
         return _TensorDim(self, name)
 
-    @property
-    def dimensions(self):
-        return [_TensorDim(self, name) for name in self.shape.names]
-
     def __getattr__(self, name):
+        assert name not in ('shape', '_shape')
         if name in self.shape:
             return _TensorDim(self, name)
         raise AttributeError("%s with shape %s has no attribute '%s'" % (self.__class__, self.shape, name))
@@ -263,24 +261,24 @@ class AbstractTensor:
         if isinstance(other, AbstractTensor):
             return other
         elif isinstance(other, Shape):
-            assert self.shape.channel.rank == 1
-            if self.shape.channel.sizes[0] == self.shape.spatial.rank:
-                sizes = other.select(*self.shape.spatial.names).sizes
-                return tensor(sizes)
-            else:
-                assert other.spatial.rank == self.shape.channel.volume
-                return tensor(other.spatial.sizes)
+            assert self.shape.channel.rank == 1, "Only single-channel tensors support implicit casting from Shape to tensor"
+            assert other.rank == self.shape.channel.volume
+            return tensor(other.spatial.sizes, names=self.shape.channel.names)
         else:
             try:
-                other_tensor = tensor(other, infer_dimension_types=False)
+                other_tensor = native_math.as_tensor(other, convert_external=True)
+                shape = native_math.staticshape(other_tensor)
             except ValueError as e:
                 raise ValueError(e)
-            if other_tensor.rank in (0, 1):
+            if len(shape) == 0:
+                return NativeTensor(other_tensor, EMPTY_SHAPE)
+            elif len(shape) == self.rank:
+                return NativeTensor(other_tensor, self.shape.with_sizes(shape))
+            elif len(shape) == self.shape.channel.rank:
+                other_tensor = tensor(other, names=self.shape.channel.names, infer_dimension_types=False)
                 return other_tensor
-            elif other_tensor.rank == self.rank:
-                return other_tensor._with_shape_replaced(self.shape.with_sizes(other_tensor.shape.sizes))
-            elif other_tensor.rank == self.shape.channel.rank:
-                return other_tensor
+            elif len(shape) == 1 and self.shape.channel.rank == 0:
+                return NativeTensor(other_tensor, Shape(shape, ['vector' if shape[0] == self.shape.spatial.rank else 'channel'], [CHANNEL_DIM]))
             else:
                 raise ValueError("Cannot broadcast object of rank %d to tensor with shape %s" % (native_math.ndims(other), self.shape))
 
@@ -402,7 +400,7 @@ class NativeTensor(AbstractTensor):
         new_shape = new_shape.with_sizes(native_math.staticshape(gathered))
         return NativeTensor(gathered, new_shape)
 
-    def unstack(self, dimension=0):
+    def unstack(self, dimension):
         dim_index = self.shape.index(dimension)
         new_shape = self.shape.without(dimension)
         tensors = native_math.unstack(self.tensor, axis=dim_index)
@@ -452,7 +450,7 @@ class CollapsedTensor(AbstractTensor):
     def shape(self):
         return self._shape
 
-    def unstack(self, dimension=0):
+    def unstack(self, dimension):
         unstacked_shape = self.shape.without(dimension)
         if dimension in self.tensor.shape:
             unstacked = self.tensor.unstack(dimension)
@@ -539,9 +537,9 @@ class TensorStack(AbstractTensor):
             else:
                 raise NotImplementedError()
         else:
-            return TensorStack(tensors, self.stack_dim_name, self.shape.get_type(self.stack_dim_name))
+            return TensorStack(tensors, self.stack_dim_name, self.shape.get_type(self.stack_dim_name), keep_separate=self.keep_separate)
 
-    def unstack(self, dimension=0):
+    def unstack(self, dimension):
         if dimension == self.stack_dim_name:
             return self.tensors
         else:
@@ -550,7 +548,6 @@ class TensorStack(AbstractTensor):
     def _op2(self, other, native_function):
         other = self._tensor(other)
         if self.requires_broadcast:
-            other = tensor(other)
             if self.stack_dim_name in other.shape:
                 other = other.unstack(self.stack_dim_name)
                 tensors = [t1._op2(t2, native_function) for t1, t2 in zip(self.tensors, other)]
@@ -572,36 +569,34 @@ class TensorStack(AbstractTensor):
         return self.keep_separate or not self._shape.well_defined
 
 
-def tensor(*objects, infer_dimension_types=True, batch_dims=None, spatial_dims=None, channel_dims=None):
+def tensor(*objects, names=None, infer_dimension_types=True, batch_dims=None, spatial_dims=None, channel_dims=None):
     if len(objects) == 1:
-        return _tensor(objects[0], infer_dimension_types, batch_dims, spatial_dims, channel_dims)
+        return _tensor(objects[0], names, infer_dimension_types, batch_dims, spatial_dims, channel_dims)
     else:
-        return [_tensor(obj, infer_dimension_types, batch_dims, spatial_dims, channel_dims) for obj in objects]
+        return [_tensor(obj, names, infer_dimension_types, batch_dims, spatial_dims, channel_dims) for obj in objects]
 
 
-def _tensor(obj, infer_dimension_types=True, batch_dims=None, spatial_dims=None, channel_dims=None):
+def _tensor(obj, names=None, infer_dimension_types=True, batch_dims=None, spatial_dims=None, channel_dims=None):
     if isinstance(obj, AbstractTensor):
-        if batch_dims is not None:
-            assert obj.shape.batch.rank == batch_dims
-        if spatial_dims is not None:
-            assert obj.shape.spatial.rank == spatial_dims
-        if channel_dims is not None:
-            assert obj.shape.channel.rank == channel_dims
         return obj
     if isinstance(obj, np.ndarray) and obj.dtype != np.object:
-        if infer_dimension_types and len(obj.shape) > 1:
-            shape = infer_shape(obj.shape, batch_dims, spatial_dims, channel_dims)
+        if infer_dimension_types:
+            shape = infer_shape(obj.shape, names, batch_dims, spatial_dims, channel_dims)
             tensor = NativeTensor(obj, shape)
             for dim in shape.non_spatial.singleton.names:
                 tensor = tensor.dimension(dim)[0]  # Remove singleton batch and channel dimensions
             return tensor
         else:
-            shape = Shape(obj.shape, names=range(len(obj.shape)), types=[CHANNEL_DIM] * len(obj.shape))
+            if names is None:
+                names = ['channel%d' % i for i in range(len(obj.shape))]
+            else:
+                names = _shape.names(names, len(obj.shape))
+            shape = Shape(obj.shape, names, [CHANNEL_DIM] * len(obj.shape))
             return NativeTensor(obj, shape)
     if isinstance(obj, (tuple, list)):
         array = np.array(obj)
         if array.dtype != np.object:
-            return _tensor(array, infer_dimension_types=False)
+            return _tensor(array, names, infer_dimension_types=False)
         else:
             raise NotImplementedError()
             return TensorStack(tensor(obj), dim_name=None, dim_type=CHANNEL_DIM)
@@ -609,7 +604,7 @@ def _tensor(obj, infer_dimension_types=True, batch_dims=None, spatial_dims=None,
         array = np.array(obj)
         return NativeTensor(array, EMPTY_SHAPE)
     if isinstance(obj, Shape):
-        return _tensor(obj.sizes)
+        return _tensor(obj.sizes, names)
     raise ValueError(obj)
 
 

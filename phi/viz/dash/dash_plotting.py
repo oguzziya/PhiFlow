@@ -144,8 +144,8 @@ def heatmap(field, settings):
     points = field.points
     if physics_config.is_x_first:
         z = np.transpose(z)
-        x = points[0].y[0].numpy()
-        y = points[1].x[0].numpy()
+        x = points.vector[0].y[0].numpy()
+        y = points.vector[1].x[0].numpy()
     else:
         y = field.points[0, :, 0, 0]
         x = field.points[0, 0, :, 1]

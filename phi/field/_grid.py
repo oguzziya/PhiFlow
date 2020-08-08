@@ -107,9 +107,9 @@ class CenteredGrid(Grid):
             if len(reduce_channels) > 1:
                 raise NotImplementedError()
             channels = []
-            for i, channel in enumerate(self._data.unstack()):
+            for i, channel in enumerate(self._data.vector.unstack()):
                 channels.append(math.resample(channel, local_points[{reduce_channels[0]: i}], 'linear', self.extrapolation))
-            return math.channel_stack(channels)
+            return math.channel_stack(channels, 'vector')
 
     def _shift_resample(self, resolution, box):
         paddings = _required_paddings_transposed(self.box, self.dx, box)

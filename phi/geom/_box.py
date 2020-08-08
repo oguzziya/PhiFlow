@@ -39,7 +39,7 @@ class AbstractBox(Geometry):
         raise NotImplementedError(self)
 
     def bounding_radius(self):
-        return math.max(self.size, axis=0) * 1.414214
+        return math.max(self.size, 'vector') * 1.414214
 
     def bounding_half_extent(self):
         return self.size * 0.5
@@ -52,7 +52,7 @@ class AbstractBox(Geometry):
 
     def lies_inside(self, location):
         bool_inside = (location >= self.lower) & (location <= self.upper)
-        return math.all(bool_inside, axis=0)
+        return math.all(bool_inside, 'vector')
 
     def approximate_signed_distance(self, location):
         """
@@ -103,8 +103,8 @@ class AABox(AbstractBox):
     """
 
     def __init__(self, lower, upper):
-        self._lower = tensor(lower, channel_dims=1, spatial_dims=0)
-        self._upper = tensor(upper, channel_dims=1, spatial_dims=0)
+        self._lower = tensor(lower, names='..., vector', channel_dims=1, spatial_dims=0)
+        self._upper = tensor(upper, names='..., vector', channel_dims=1, spatial_dims=0)
         self._shape = _fill_spatial_with_singleton(combined_shape(self._lower, self._upper))
 
     @property
@@ -172,8 +172,8 @@ class AABox(AbstractBox):
 class Cuboid(AbstractBox):
 
     def __init__(self, center, half_size):
-        self._center = tensor(center)
-        self._half_size = tensor(half_size)
+        self._center = tensor(center, names='..., vector', channel_dims=1, spatial_dims=0)
+        self._half_size = tensor(half_size, names='..., vector', channel_dims=1, spatial_dims=0)
         self._shape = _fill_spatial_with_singleton(combined_shape(self._center, self._half_size))
 
     @property

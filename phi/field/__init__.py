@@ -8,7 +8,7 @@ from ._util import data_bounds, expose_tensors, conjugate_gradient
 from ._mask import GeometryMask
 from ._noise import Noise
 from ._angular_velocity import AngularVelocity
-from ._field_math import laplace, gradient, staggered_gradient, divergence, stagger, mean, staggered_curl_2d, pad
+from ._field_math import laplace, gradient, staggered_gradient, divergence, stagger, mean, staggered_curl_2d, pad, shift
 
 from phi import math as _math
 _math.DYNAMIC_BACKEND.add_backend(SymbolicFieldBackend(_math.DYNAMIC_BACKEND), priority=True)
