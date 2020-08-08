@@ -25,7 +25,7 @@ def indices_tensor(tensor, dtype=None):
     :return: an index tensor of shape (1, spatial dimensions..., spatial rank)
     """
     spatial_dimensions = list(tensor.shape[1:-1])
-    idx_zyx = np.meshgrid(*[range(dim) for dim in spatial_dimensions], indexing='ij')
+    idx_zyx = math.meshgrid(*[range(dim) for dim in spatial_dimensions])
     idx = np.stack(idx_zyx, axis=-1).reshape([1, ] + spatial_dimensions + [len(spatial_dimensions)])
     if dtype is not None:
         return idx.astype(dtype)
@@ -135,8 +135,22 @@ def abs_square(complex):
 #     return math.sum(components, 0)
 
 
-def offset(x: AbstractTensor, axes: tuple, offsets: tuple, padding=extrapolation.BOUNDARY, stack_name='offset'):
-    pass
+def offset(x: AbstractTensor, offsets: tuple, axes: tuple or None = None, padding: Extrapolation or None = extrapolation.BOUNDARY, stack_name='offset') -> AbstractTensor:
+    x = tensor(x)
+    axes = axes if axes is not None else x.shape.spatial.names
+    pad_lower = max(0, -min(offsets))
+    pad_upper = max(0, max(offsets))
+    if padding is not None:
+        x = math.pad(x, {axis: (pad_lower, pad_upper) for axis in axes}, mode=padding)
+    offset_tensors = []
+    for offset in offsets:
+        components = {}
+        for dimension in axes:
+            slices = [slice(pad_lower + offset, -pad_upper + offset) if dim == dimension else slice(pad_lower, -pad_upper) for dim in axes]
+            slices = tuple([slice(sl.start, sl.stop if sl.stop < 0 else None) for sl in slices])  # replace stop=0 by stop=None
+            components[dimension] = x[slices]
+        offset_tensors.append(vector_stack(components))
+    return offset_tensors
 
 
 # Gradient

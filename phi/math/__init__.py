@@ -52,6 +52,7 @@ from ._tensor_math import (
     conjugate_gradient,
 )
 from ._nd import (
+    offset,
     indices_tensor,
     normalize_to,
     l1_loss, l2_loss, l_n_loss, frequency_loss,
