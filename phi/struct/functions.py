@@ -173,6 +173,14 @@ def map_item(item, function, struct, leaf_condition=None, recursive=True, conten
     return map(function, struct, leaf_condition=leaf_condition, recursive=recursive, trace=False, item_condition=item_condition, content_type=content_type)
 
 
+def foreach(function, *structs, leaf_condition=None, recursive=True, trace=False, item_condition=None):
+    if len(structs) == 1:
+        map(function, structs[0], leaf_condition, recursive, trace, item_condition, content_type=INVALID)
+    else:
+        struct = zip(structs, leaf_condition, item_condition)
+        map(function, struct, leaf_condition, recursive, trace, item_condition, content_type=INVALID)
+
+
 class Trace(object):
     """
 Used in struct.map if trace=True.

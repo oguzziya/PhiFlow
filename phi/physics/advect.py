@@ -1,3 +1,13 @@
+"""
+Container for different advection schemes for grids and particles.
+
+Esamples:
+
+* semi_lagrangian (grid)
+* mac_cormack (grid)
+* runge_kutta_4 (particle)
+"""
+
 from phi import math
 from phi.field import SampledField, ConstantField, StaggeredGrid, CenteredGrid, Grid, Field
 

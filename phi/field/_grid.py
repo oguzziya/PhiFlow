@@ -13,6 +13,15 @@ from ..math import Shape, tensor, AbstractTensor
 
 
 class Grid(SampledField, ABC):
+    """
+    Base class for CenteredGrid, StaggeredGrid.
+
+    Grids are defined by
+
+    * data: Tensor, defines resolution
+    * box: physical size of the grid, defines dx
+    * extrapolation: values of virtual grid points lying outside the data bounds
+    """
 
     def __init__(self, resolution, box, extrapolation=math.extrapolation.ZERO):
         assert isinstance(extrapolation, (Extrapolation, tuple, list)), extrapolation
@@ -40,18 +49,14 @@ class Grid(SampledField, ABC):
 
 
 class CenteredGrid(Grid):
+    """
+    N-dimensional grid whose values are sampled at the cell centers.
+    A centered grid is defined through its data tensor, its box describing the physical size and extrapolation.
+
+    Centered grids support arbitrary batch, spatial and channel dimensions.
+    """
 
     def __init__(self, data, box=None, extrapolation=math.extrapolation.ZERO):
-        """
-        Create CenteredGrid given its data and dimensions.
-
-        :param data: numerical values to be set as values of CenteredGrid (immutable)
-        :type data: array-like
-        :param box: numerical values describing the surrounding area of the CenteredGrid, defaults to None
-        :type box: domain.box, optional
-        :param extrapolation: set conditions for boundaries, defaults to 'boundary'
-        :type extrapolation: str, optional
-        """
         self._data = tensor(data)
         Grid.__init__(self, self.resolution, box, extrapolation)
         assert_same_rank(self._data.shape, self._box, 'data dimensions %s do not match box %s' % (self._data.shape, self._box))

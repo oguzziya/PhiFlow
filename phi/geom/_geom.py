@@ -5,6 +5,18 @@ from phi.math import AbstractTensor
 
 
 class Geometry:
+    """
+    Abstract base class for N-dimensional shapes.
+
+    Main implementing classes:
+
+    * Sphere
+    * box family: box (generator), AABox, Cuboid, AbstractBox
+
+    All geometry objects support batching.
+    Thereby any parameter defining the geometry can be varied along arbitrary batch dimensions.
+    All batch dimensions are listed in Geometry.shape.
+    """
 
     @property
     def center(self):

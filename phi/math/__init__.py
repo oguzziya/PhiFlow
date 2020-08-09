@@ -1,10 +1,29 @@
+"""
+The phi.math package is the main API for tensor / array operations in PhiFlow.
+It provides a common inferface for mathematical operations over tensors which currently supports NumPy, TensorFlow and PyTorch.
+
+Provides
+
+* A tensor base class with multiple implementations
+* A NumPy-like API for mathematical operations over tensors as well as tensor generation
+
+The provided operations are not implemented directly.
+Instead, they delegate the actual computation to either NumPy, TensorFlow or PyTorch, depending on the configuration.
+This allows the user to write simulation code once and have it run with various computation backends.
+
+Main classes:
+
+* Tensor
+* Shape
+"""
+
 from .backend import DYNAMIC_BACKEND, extrapolation
 from .backend._scipy_backend import SCIPY_BACKEND
 
 from phi.struct.struct_backend import StructBroadcastBackend
 
 from ._shape import Shape, define_shape, spatial_shape, infer_shape
-from ._tensors import tensor, AbstractTensor, combined_shape
+from ._tensors import tensor, AbstractTensor, combined_shape, AbstractTensor as Tensor
 from ._tensor_math import (
     is_tensor, as_tensor,
     copy,

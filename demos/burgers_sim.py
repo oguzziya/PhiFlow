@@ -10,8 +10,7 @@ def step():
     global velocity
     velocity = diffuse(velocity, 0.1, 1)
     velocity = advect.semi_lagrangian(velocity, velocity, 1.0)
-    field.write(velocity, app.scene.subpath('velocity.npz'))
-    # app.scene.write(BurgersVelocity(domain, velocity))
+    write_sim_frame(app.directory, velocity, app.frame, 'velocity')
 
 
 app = App('Burgers Equation in %dD' % len(domain.resolution), framerate=5)

@@ -5,11 +5,11 @@ from ._analytic import AnalyticField
 
 class GeometryMask(AnalyticField):
     """
+    Field that takes the value 1 inside a Geometry object and 0 outside.
+    When sampled at single points, the result is binary.
+    When sampled given another geometry, the approximate overlap between the geometries is computed, allowing for fractional values between 0 and 1.
 
-    Antialias:
-        If False, field values are either 0 (outside) or 1 (inside) and the field is not differentiable w.r.t. the geometry.
-        If True, field values smoothly go from 0 to 1 at the surface and the field is differentiable w.r.t. the geometry.
-
+    This field supports batched geometries.
     """
 
     def __init__(self, geometry: Geometry):

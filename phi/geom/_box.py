@@ -205,7 +205,17 @@ class Cuboid(AbstractBox):
 
 
 class BoxGenerator(object):
+    """
+    Convenience function for creating N-dimensional boxes / cuboids.
 
+    Examples to create a box from (0, 0) to (10, 20):
+
+    * box[0:10, 0:20]
+    * box((0, 0), (10, 20))
+    * box((5, 10), size=(10, 20))
+    * box(center=(5, 10), size=(10, 20))
+    * box((10, 20))
+    """
     def __getitem__(self, item):
         if not isinstance(item, (tuple, list)):
             item = [item]

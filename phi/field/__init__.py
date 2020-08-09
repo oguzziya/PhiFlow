@@ -1,3 +1,15 @@
+"""
+The fields module provides a number of data structures and functions to represent continuous, spatially varying data.
+
+All fields are subclasses of Field which provides abstract functions for sampling field values at physical locations.
+
+The most commonly used field types are
+
+* CenteredGrid embeds a tensor in the physical space. Uses linear interpolation between grid points.
+* StaggeredGrid samples the vector components at face centers instead of at cell centers.
+* Noise is a function that produces a procedurally generated noise field
+"""
+
 from ._field import Field, IncompatibleFieldTypes, SampledField
 from ._constant import ConstantField
 from ._grid import Grid, CenteredGrid

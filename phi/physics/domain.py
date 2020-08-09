@@ -1,12 +1,14 @@
+import warnings
+
 import numpy as np
 
 from phi import math, struct
-from phi.geom import AABox, GridCell
 from phi.math.backend.tensorop import collapse, collapsed_gather_nd
+from phi.math import spatial_shape
+from phi.geom import AABox, GridCell
 from phi.field import CenteredGrid, StaggeredGrid
 from . import State
 from .material import OPEN, Material
-from ..math import spatial_shape
 
 
 class Domain:
@@ -65,23 +67,7 @@ class Domain:
         return '(%s, size=%s)' % (self.resolution, self.box.size)
 
     def center_points(self):
-        return self.cells().center
-
-    def staggered_points(self, dimension):
-        idx_zyx = np.meshgrid(*[np.arange(0.5, dim + 1.5, 1) if dim != dimension else np.arange(0, dim + 1, 1) for dim in self.resolution], indexing="ij")
-        return math.expand_dims(math.stack(idx_zyx, axis=-1), 0)
-
-    def indices(self):
-        """
-        Constructs a grid containing the index-location as components.
-        Each index denotes the location within the tensor starting from zero.
-        Indices are encoded as vectors in the index tensor.
-
-        :param dtype: a numpy data type (default float32)
-        :return: an index tensor of shape (1, spatial dimensions..., spatial rank)
-        """
-        idx_zyx = np.meshgrid(*[range(dim) for dim in self.resolution], indexing="ij")
-        return math.expand_dims(np.stack(idx_zyx, axis=-1))
+        return self.cells.center
 
     @staticmethod
     def equal(domain1, domain2):
@@ -130,31 +116,15 @@ class Domain:
         else:
             raise ValueError('Unknown grid type: %s' % type)
 
-
     def surface_material(self, axis=0, upper_boundary=False):
         return collapsed_gather_nd(self.boundaries, axis, upper_boundary)
-
-
-def _friction_mask(masks_and_multipliers):
-    for mask, multiplier in masks_and_multipliers:
-        return mask
-
-
-def tensor_shape(batch_size, resolution, components):
-    return np.concatenate([[batch_size], resolution, [components]])
-
-
-def _extend1(shape, axis):
-    shape = list(shape)
-    shape[axis + 1] += 1
-    return shape
 
 
 @struct.definition()
 class DomainState(State):
 
     @struct.constant()
-    def domain(self, domain):
+    def domain(self, domain: Domain) -> Domain:
         return Domain.as_domain(domain)
 
     @property
@@ -166,9 +136,9 @@ class DomainState(State):
         return self.domain.rank
 
     def centered_grid(self, name, value, components=1, dtype=None):
-        extrapolation = Material.extrapolation_mode(self.domain.boundaries)
-        return self.domain.centered_grid(value, dtype=dtype, name=name, components=components, batch_size=self._batch_size, extrapolation=extrapolation)
+        warnings.warn("DomainState.centered_grid() is deprecated. The arguments 'name, components, dtype' were ignored.", DeprecationWarning)
+        return self.domain.grid(value, CenteredGrid)
 
     def staggered_grid(self, name, value, dtype=None):
-        extrapolation = Material.vector_extrapolation_mode(self.domain.boundaries)
-        return self.domain.staggered_grid(value, dtype=dtype, name=name, batch_size=self._batch_size, extrapolation=extrapolation)
+        warnings.warn("DomainState.staggered_grid() is deprecated. The arguments 'name, components, dtype' were ignored.", DeprecationWarning)
+        return self.domain.vec_grid(value, StaggeredGrid)

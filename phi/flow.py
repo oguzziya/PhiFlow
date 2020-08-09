@@ -1,33 +1,38 @@
-# pylint: disable-msg = wildcard-import, unused-wildcard-import, unused-import
+# pylint: disable-msg = unused-import
+"""
+Use this module as your main PhiFlow import.
 
-from .physics.physics import *
-from .physics.common_physics import *
-from .physics.world import *
-from .physics.schroedinger import *
-from .physics.fluid import *
-from .physics.burgers import *
-from .physics.heat import *
-from .physics.worldutil import *
-from .field import *
-from .physics.obstacle import *
-from .physics.material import *
-from .physics.domain import *
-from .physics.effect import *
+from phi.flow import *
 
-from .data.fluidformat import *
-from .data.dataset import *
-from .data.stream import *
-from .data.reader import *
+Contains:
 
-from phi.geom import *
-from phi import math, struct
-
-from .viz import display
-from .viz.display import show
-from .app import *
+* App class, show()
+* phi.math as math
+* Geometry objects
+* phi.field and common Field classes
+* Common physics functions such as diffuse, divergence_free, advect family
+* I/O functions such as write_sim_frame
+"""
 
 import numpy
+import numpy as np
 
-np = numpy
+from phi import math, struct
+
+from phi.geom import Geometry, Sphere, box, GLOBAL_AXIS_ORDER, union
+
+from phi import field
+from phi.field import Grid, CenteredGrid, StaggeredGrid, GeometryMask
+
+from phi.physics.domain import Domain
+from phi.physics.material import Material, OPEN, CLOSED, PERIODIC, NO_SLIP, NO_STICK, STICKY, SLIPPERY
+from phi.physics.common_physics import diffuse
+from phi.physics import advect
+from phi.physics.fluid import divergence_free, masked_laplace
+
+from phi.data.fluidformat import write_sim_frame
+
+from phi.app.app import App
+from phi.viz.display import show
 
 physics_config = GLOBAL_AXIS_ORDER

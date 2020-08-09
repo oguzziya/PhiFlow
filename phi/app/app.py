@@ -54,6 +54,14 @@ class TimeDependentField(object):
 
 
 class App(object):
+    """
+    Main class for defining an application that can be displayed in the GUI.
+
+    To display data, call App.add_field().
+    All fields need to be registered before the app is prepared or shown.
+
+    To launch the GUI, call show(app). This calls App.prepare() if the app was not prepared.
+    """
 
     def __init__(self,
                  name=None,
@@ -131,6 +139,10 @@ class App(object):
         self._custom_properties = custom_properties if custom_properties else {}
         self.figures = PlotlyFigureBuilder()
         self.info('App created. Scene directory is %s' % self.scene.path)
+
+    @property
+    def frame(self):
+        return self.steps
 
     def new_scene(self, count=None):
         if count is None:

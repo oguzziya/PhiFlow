@@ -56,7 +56,14 @@ class Union(Geometry):
         return rotate(self, angle)
 
 
-def union(*geometries):
+def union(*geometries) -> Geometry:
+    """
+    Union of the given geometries.
+    A point lies inside the union if it lies within at least one of the geometries.
+
+    :param geometries: arbitrary geometries with same spatial dimensions. Arbitrary batch dimensions are allowed.
+    :return: union Geometry
+    """
     if len(geometries) == 1 and isinstance(geometries[0], (tuple, list)):
         geometries = geometries[0]
     if len(geometries) == 0:

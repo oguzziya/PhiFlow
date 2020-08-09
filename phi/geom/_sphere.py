@@ -6,6 +6,10 @@ from ..math import tensor, combined_shape
 
 
 class Sphere(Geometry):
+    """
+    N-dimensional sphere.
+    Defined through center position and radius.
+    """
 
     def __init__(self, center, radius):
         self._center = tensor(center, names='..., vector', channel_dims=1, spatial_dims=0)

@@ -14,6 +14,12 @@ from ..math._tensors import TensorStack, AbstractTensor
 
 
 class StaggeredGrid(Grid):
+    """
+    N-dimensional grid whose vector components are sampled at the respective face centers.
+    A staggered grid is defined through its data tensor, its box describing the physical size and extrapolation.
+
+    Centered grids support arbitrary batch and spatial dimensions but only one channel dimension for the staggered vector components.
+    """
 
     def __init__(self, data, box=None, extrapolation=math.extrapolation.ZERO):
         assert isinstance(data, TensorStack)
