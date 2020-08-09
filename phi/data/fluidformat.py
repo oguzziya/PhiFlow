@@ -16,30 +16,6 @@ from phi import struct, math, __version__ as phi_version, field
 from phi.geom import GLOBAL_AXIS_ORDER as physics_config
 
 
-def read_zipped_array(filename):
-    file = np.load(filename)
-    array = file[file.files[-1]]  # last entry in npz file has to be data array
-    if array.shape[0] != 1 or len(array.shape) == 1:
-        array = np.expand_dims(array, axis=0)
-    if not physics_config.is_x_first and array.shape[-1] != 1:
-        array = array[..., ::-1]  # component order in stored files is always XYZ
-    return array
-
-
-def write_zipped_array(filename, array):
-    if array.shape[0] == 1 and len(array.shape) > 1:
-        array = array[0, ...]
-    if not physics_config.is_x_first and array.shape[-1] != 1:
-        array = array[..., ::-1]  # component order in stored files is always XYZ
-    np.savez_compressed(filename, array)
-
-
-def _check_same_dimensions(arrays):
-    for array in arrays:
-        if array.shape[1:-1] != arrays[0].shape[1:-1]:
-            raise ValueError("All arrays should have the same spatial dimensions, but got %s and %s" % (array.shape, arrays[0].shape))
-
-
 def read_sim_frame(simpath, fieldnames, frame, set_missing_to_none=True):
     if isinstance(fieldnames, str):
         fieldnames = [fieldnames]

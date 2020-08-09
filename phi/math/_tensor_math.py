@@ -88,7 +88,7 @@ def fftfreq(resolution, dtype=None):
     k = [math.to_float(channel) if dtype is None else math.cast(channel, dtype) for channel in k]
     channel_shape = spatial_shape(k[0].shape)
     k = [NativeTensor(channel, channel_shape) for channel in k]
-    return TensorStack(k, 0, CHANNEL_DIM)
+    return TensorStack(k, 'vector', CHANNEL_DIM)
 
 
 def meshgrid(*coordinates):

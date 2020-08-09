@@ -10,7 +10,7 @@ from ..geom._box import AbstractBox, GridCell
 from ..geom._stack import GeometryStack
 from ..math import tensor, Shape
 from ..math._shape import CHANNEL_DIM
-from ..math._tensors import TensorStack
+from ..math._tensors import TensorStack, AbstractTensor
 
 
 class StaggeredGrid(Grid):
@@ -173,20 +173,18 @@ class StaggeredGrid(Grid):
     #     return self.with_data(data)
 
 
-def unstack_staggered_tensor(tensor):
-    tensors = math.unstack(tensor, -1)
-    result = []
-    for i, dim in enumerate(math.spatial_dimensions(tensor)):
-        slices = [slice(None, -1) if d != dim else slice(None) for d in math.spatial_dimensions(tensor)]
-        result.append(math.expand_dims(tensors[i][tuple([slice(None)]+slices)], -1))
-    return result
+def unstack_staggered_tensor(data: AbstractTensor) -> AbstractTensor:
+    sliced = []
+    for dim, component in zip(data.shape.spatial.names, data.unstack('vector')):
+        sliced.append(component[{d: slice(None, -1) for d in data.shape.spatial.without(dim).names}])
+    return math.channel_stack(sliced, 'vector')
 
 
-def stack_staggered_components(tensors):
-    for i, tensor in enumerate(tensors):
-        paddings = [[0, 1] if d != i else [0, 0] for d in range(len(tensors))]
-        tensors[i] = math.pad(tensor, [[0, 0]] + paddings + [[0, 0]])
-    return math.concat(tensors, -1)
+def stack_staggered_components(data: AbstractTensor) -> AbstractTensor:
+    padded = []
+    for dim, component in zip(data.shape.spatial.names, data.unstack('vector')):
+        padded.append(math.pad(component, {d: (0, 1) for d in data.shape.spatial.without(dim).names}))
+    return math.channel_stack(padded, 'vector')
 
 
 def extend_symmetric(resolution: Shape, box: AbstractBox, axis, cells=1):

@@ -35,6 +35,9 @@ class Grid(SampledField, ABC):
     def extrapolation(self) -> Extrapolation:
         return self._extrapolation
 
+    def __repr__(self):
+        return '%s[%s, size=%s, extrapolation=%s]' % (self.__class__.__name__, self.shape, self.box.size, self._extrapolation)
+
 
 class CenteredGrid(Grid):
 
@@ -52,9 +55,6 @@ class CenteredGrid(Grid):
         self._data = tensor(data)
         Grid.__init__(self, self.resolution, box, extrapolation)
         assert_same_rank(self._data.shape, self._box, 'data dimensions %s do not match box %s' % (self._data.shape, self._box))
-
-    def __repr__(self):
-        return 'Grid[%s, size=%s]' % (self.shape, self.box.size)
 
     @staticmethod
     def sample(value, resolution, box, extrapolation=math.extrapolation.ZERO):

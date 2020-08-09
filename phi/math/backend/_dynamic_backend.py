@@ -14,7 +14,7 @@ class DynamicBackend(Backend):
 
     def __init__(self):
         self.backends = []
-        self.default_backend = None
+        self.default_backend: Backend = None
         Backend.__init__(self, 'Dynamic')
 
     @property

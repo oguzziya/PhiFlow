@@ -13,7 +13,7 @@ Each call to at() or sample_at() generates a new noise field.
 Noise can be used as an initializer for CenteredGrids or StaggeredGrids.
 """
 
-    def __init__(self, channels=(), scale=10, smoothness=1.0, batch=None):
+    def __init__(self, channels=(), scale=10, smoothness=1.0, batch=None, names=None):
         """
 
         :param channels: Number of independent random scalar fields this Field consists of
@@ -22,7 +22,7 @@ Noise can be used as an initializer for CenteredGrids or StaggeredGrids.
         """
         self.scale = scale
         self.smoothness = smoothness
-        self._shape = math.define_shape(channels, batch)
+        self._shape = math.define_shape(channels, batch=batch, names=names)
 
     @property
     def shape(self):
@@ -37,7 +37,7 @@ Noise can be used as an initializer for CenteredGrids or StaggeredGrids.
         shape = (self._shape if shape is None else shape).combined(resolution)
         rndj = math.to_complex(random_normal(shape)) + 1j * math.to_complex(random_normal(shape))  # Note: there is no complex32
         k = math.fftfreq(resolution) * resolution / size * self.scale  # in physical units
-        k = math.sum(k ** 2, axis=0)
+        k = math.vec_squared(k)
         lowest_frequency = 0.1
         weight_mask = 1 / (1 + math.exp((lowest_frequency - k) * 1e3))  # High pass filter
         # --- Compute 1/k ---

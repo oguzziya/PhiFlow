@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+
 class IncompatibleExtrapolations(ValueError):
     def __init__(self, extrapolation1, extrapolation2):
         ValueError.__init__(self, extrapolation1, extrapolation2)
 
 
 class Extrapolation:
+
+    def to_dict(self) -> dict:
+        raise NotImplementedError()
 
     def gradient(self) -> Extrapolation:
         """
@@ -23,6 +27,11 @@ class ConstantExtrapolation(Extrapolation):
 
     def __repr__(self):
         return repr(self.value)
+
+    def to_dict(self) -> dict:
+        from . import math
+        value = math.numpy(self.value)
+        return {'type': 'constant', 'value': value}
 
     def gradient(self):
         return ZERO
@@ -99,6 +108,9 @@ class ConstantExtrapolation(Extrapolation):
 
 
 class _StatelessExtrapolation(Extrapolation):
+
+    def to_dict(self) -> dict:
+        return {'type': repr(self)}
 
     def gradient(self):
         raise NotImplementedError()
@@ -181,5 +193,21 @@ PERIODIC = _PeriodicExtrapolation()
 BOUNDARY = _BoundaryExtrapolation()
 SYMMETRIC = _SymmetricExtrapolation()
 REFLECT = _ReflectExtrapolation()
+
+
+def from_dict(dictionary: dict) -> Extrapolation:
+    etype = dictionary['type']
+    if etype == 'constant':
+        return ConstantExtrapolation(dictionary['value'])
+    elif etype == 'periodic':
+        return PERIODIC
+    elif etype == 'boundary':
+        return BOUNDARY
+    elif etype == 'symmetric':
+        return SYMMETRIC
+    elif etype == 'reflect':
+        return REFLECT
+    else:
+        raise ValueError(dictionary)
 
 
