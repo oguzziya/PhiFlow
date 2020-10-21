@@ -1,9 +1,10 @@
 from phi.tf.flow import *
 import jax.numpy as jnp
 from jax.ops import index, index_update
+import eagerpy as ep
 
 # IMPORTANT
-# Jax allocates 90 percent of available memory, which causes out of memory errors when used with
+# Jax allocates 90 percent of available GPU memory, which causes out of memory errors when used with
 # TensorFlow GPU
 # To suppress: export XLA_PYTHON_CLIENT_PREALLOCATE=false
 
@@ -17,15 +18,8 @@ def initialize_data_3d(data, res):
     return patched
 
 def semi_lagrangian_update(x, v, dt):
-    x -= v * dt
-    return x
+    x_new = x - v*dt
+    return x_new
 
-def semi_lagrangian_tf(field, velocity_field, dt, field_shape):
-    x = field.points.data
-    v = velocity_field.at(field.points)
-
-    x = semi_lagrangian_update(x, v.data, dt)
-
-    data = field.sample_at(x)
-
-    return data
+def patch_inflow(inflow_tensor, x, dt):
+    return x + inflow_tensor * dt

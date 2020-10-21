@@ -59,16 +59,25 @@ else:
 
 for i in range(GRAPH_STEPS):
 
-    # Density advection using semi-lagrangian discretization. Reshape is necessary since it throws an unknown shape
-    # error.
-    density_tensor = jax_utils.semi_lagrangian_tf(DENSITY, VELOCITY, DT, DENSITY.points.data.shape) + DT * inflow_tensor
+    # Advect density
+    x = DENSITY.points.data
+    v = VELOCITY.sample_at(x)
+    x = jax_utils.semi_lagrangian_update(x, v, DT)
+    x = DENSITY.sample_at(x)
+    x = jax_utils.patch_inflow(inflow_tensor, x, DT)
 
-    # Advect the velocity.
-    velocity_tensor = [jax_utils.semi_lagrangian_tf(component, VELOCITY, DT, component.points.data.shape) for component in VELOCITY.unstack()]
+    x_vel_list = []
+
+    for component in VELOCITY.unstack():
+        x_vel = component.points.data
+        v_vel = VELOCITY.sample_at(x_vel)
+        x_vel = jax_utils.semi_lagrangian_update(x_vel, v_vel, DT)
+        x_vel = component.sample_at(x_vel)
+        x_vel_list.append(x_vel)
 
     # Update the object data
-    DENSITY = DENSITY.with_data(density_tensor)
-    VELOCITY = VELOCITY.with_data(velocity_tensor)
+    DENSITY = DENSITY.with_data(x)
+    VELOCITY = VELOCITY.with_data(x_vel_list)
 
     # Buoyancy effects and incompressible flow
     VELOCITY += buoyancy(DENSITY, 9.81, FLOW.buoyancy_factor)
