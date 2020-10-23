@@ -1,7 +1,6 @@
 from phi.tf.flow import *
 import jax.numpy as jnp
 from jax.ops import index, index_update
-import eagerpy as ep
 
 # IMPORTANT
 # Jax allocates 90 percent of available GPU memory, which causes out of memory errors when used with

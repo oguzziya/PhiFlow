@@ -211,7 +211,7 @@ class CudaCommand(distutils.cmd.Command):
 
     def initialize_options(self):
         self.gcc = 'gcc'
-        self.gcc_4_8 = 'g++-4.8'
+        self.gcc_4_8 = 'g++-9'
         self.nvcc = 'nvcc'
         self.cuda_lib = '/usr/local/cuda/lib64/'
 

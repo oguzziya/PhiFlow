@@ -2,8 +2,10 @@
 # note, this example does not use the dash GUI, instead it creates PNG images via PIL
 
 from phi.tf.flow import *  # Use TensorFlow
-import tensorflow as tf
+from phi.tf.tf_cuda_pressuresolver import CUDASolver
 import jax_utils
+from jax import device_put
+import tensorflow as tf
 
 import jax.numpy as jnp
 
@@ -48,7 +50,9 @@ VELOCITY = FLOW_IN.velocity
 
 density_tensor = DENSITY.data
 velocity_tensor = [component.data for component in VELOCITY.unstack()]
-inflow_tensor = jnp.zeros(shape=density_shape)
+inflow_tensor = jnp.zeros(shape=density_shape).block_until_ready()
+
+print(type(inflow_tensor))
 
 # Set the inflow density value
 if DIM == 2:
@@ -56,15 +60,22 @@ if DIM == 2:
 else:
     inflow_tensor = jax_utils.initialize_data_3d(inflow_tensor, RES)
 
+inflow_tensor = device_put(inflow_tensor)
 
 for i in range(GRAPH_STEPS):
 
     # Advect density
-    x = DENSITY.points.data
-    v = VELOCITY.sample_at(x)
-    x = jax_utils.semi_lagrangian_update(x, v, DT)
-    x = DENSITY.sample_at(x)
-    x = jax_utils.patch_inflow(inflow_tensor, x, DT)
+    x_rho = DENSITY.points.data
+
+    x_rho_proto = tf.make_tensor_proto(x_rho)
+    x_rho_np = tf.make_ndarray(x_rho_proto)
+    x_rho_np = device_put(x_rho_np)
+
+    v_rho = VELOCITY.sample_at(x_rho_np)
+
+    x_rho_np = jax_utils.semi_lagrangian_update(x_rho, v_rho, DT)
+    x_rho_np = DENSITY.sample_at(x_rho_np)
+    x_rho_np = jax_utils.patch_inflow(inflow_tensor, x_rho_np, DT)
 
     x_vel_list = []
 
@@ -76,12 +87,12 @@ for i in range(GRAPH_STEPS):
         x_vel_list.append(x_vel)
 
     # Update the object data
-    DENSITY = DENSITY.with_data(x)
+    DENSITY = DENSITY.with_data(x_rho_np)
     VELOCITY = VELOCITY.with_data(x_vel_list)
 
     # Buoyancy effects and incompressible flow
     VELOCITY += buoyancy(DENSITY, 9.81, FLOW.buoyancy_factor)
-    VELOCITY = divergence_free(VELOCITY, FLOW.domain, obstacles=())
+    VELOCITY = divergence_free(VELOCITY, FLOW.domain, obstacles=(), pressure_solver=CUDASolver())
 
 # main , step 2: do actual sim run (TF only)
 
