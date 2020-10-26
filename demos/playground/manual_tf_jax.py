@@ -64,14 +64,20 @@ inflow_tensor = device_put(inflow_tensor)
 
 for i in range(GRAPH_STEPS):
 
-    # Advect density
+    # Type: tf.Tensor
     x_rho = DENSITY.points.data
 
+    # Move to GPU, Type: jax.array
     x_rho_proto = tf.make_tensor_proto(x_rho)
     x_rho_np = tf.make_ndarray(x_rho_proto)
     x_rho_np = device_put(x_rho_np)
 
+    # Type(v_rho): tf.Tensor
     v_rho = VELOCITY.sample_at(x_rho_np)
+
+    v_rho_proto = tf.make_tensor_proto(v_rho)
+    v_rho_np = tf.make_ndarray(v_rho_proto)
+    v_rho_np = device_put(v_rho_np)
 
     x_rho_np = jax_utils.semi_lagrangian_update(x_rho, v_rho, DT)
     x_rho_np = DENSITY.sample_at(x_rho_np)
