@@ -48,38 +48,28 @@ FLOW_IN = FLOW.copied_with(density=placeholder, velocity=placeholder)
 DENSITY = FLOW_IN.density
 VELOCITY = FLOW_IN.velocity
 
-density_tensor = DENSITY.data
-velocity_tensor = [component.data for component in VELOCITY.unstack()]
-inflow_tensor = jnp.zeros(shape=density_shape).block_until_ready()
-
-print(type(inflow_tensor))
-
 # Set the inflow density value
+inflow_tensor = jnp.zeros(shape=density_shape).block_until_ready()
 if DIM == 2:
     inflow_tensor = jax_utils.initialize_data_2d(inflow_tensor, RES)
+    inflow_tensor = device_put(inflow_tensor)
 else:
     inflow_tensor = jax_utils.initialize_data_3d(inflow_tensor, RES)
-
-inflow_tensor = device_put(inflow_tensor)
+    inflow_tensor = device_put(inflow_tensor)
 
 for i in range(GRAPH_STEPS):
 
-    # Type: tf.Tensor
-    x_rho = DENSITY.points.data
+    x_rho_tensor = DENSITY.points.data
 
-    # Move to GPU, Type: jax.array
-    x_rho_proto = tf.make_tensor_proto(x_rho)
+    # Tensor to numpy array transfer routine
+    x_rho_proto = tf.make_tensor_proto(DENSITY.points.data)
     x_rho_np = tf.make_ndarray(x_rho_proto)
     x_rho_np = device_put(x_rho_np)
 
     # Type(v_rho): tf.Tensor
     v_rho = VELOCITY.sample_at(x_rho_np)
 
-    v_rho_proto = tf.make_tensor_proto(v_rho)
-    v_rho_np = tf.make_ndarray(v_rho_proto)
-    v_rho_np = device_put(v_rho_np)
-
-    x_rho_np = jax_utils.semi_lagrangian_update(x_rho, v_rho, DT)
+    x_rho_np = jax_utils.semi_lagrangian_update(x_rho_tensor, v_rho, DT)
     x_rho_np = DENSITY.sample_at(x_rho_np)
     x_rho_np = jax_utils.patch_inflow(inflow_tensor, x_rho_np, DT)
 
@@ -88,6 +78,7 @@ for i in range(GRAPH_STEPS):
     for component in VELOCITY.unstack():
         x_vel = component.points.data
         v_vel = VELOCITY.sample_at(x_vel)
+        # Why do we get "List of tensors after sample_at() ?
         x_vel = jax_utils.semi_lagrangian_update(x_vel, v_vel, DT)
         x_vel = component.sample_at(x_vel)
         x_vel_list.append(x_vel)
