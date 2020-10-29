@@ -246,6 +246,7 @@ setup(
               'phi.physics.pressuresolver',
               'phi.struct',
               'phi.tf',
+              'phi.torch',
               'phi.viz',
               'phi.viz.dash',
               'webglviewer'],
