@@ -249,6 +249,7 @@ setup(
               'phi.torch',
               'phi.viz',
               'phi.viz.dash',
+              'tests',
               'webglviewer'],
     cmdclass={
         'tf_cuda': CudaCommand,
