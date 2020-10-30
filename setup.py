@@ -280,6 +280,7 @@ setup(
                 'dash-html-components',
                 'dash-core-components',
                 'plotly',
-                'imageio'],
+                'imageio',
+                'matplotlib'],
     }
 )
