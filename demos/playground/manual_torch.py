@@ -1,14 +1,11 @@
 from phi.torch.flow import *
-import phi.math as math
 import utils
 import matplotlib.pyplot as plt
-
-from tests import test_fluid_torch
 
 DIM = 2
 BATCH_SIZE = 1
 STEPS = 10
-RES = 64
+RES = 128
 DT = 0.6
 
 SAVE_IMAGE = False
@@ -35,9 +32,7 @@ else:
     inflow_tensor = utils.initialize_data_3d(inflow_tensor, RES)
 
 for i in range(STEPS):
-
-    x_rho = DENSITY.points.data
-    print(type(x_rho))
+    x_rho = torch_from_numpy(DENSITY.points.data)
     v_rho = VELOCITY.sample_at(x_rho)
     x_rho = utils.semi_lagrangian_update(x_rho, v_rho, DT)
     x_rho = DENSITY.sample_at(x_rho)
@@ -46,7 +41,7 @@ for i in range(STEPS):
     x_vel_list = []
 
     for component in VELOCITY.unstack():
-        x_vel = component.points.data
+        x_vel = torch_from_numpy(component.points.data)
         v_vel = VELOCITY.sample_at(x_vel)
         x_vel = utils.semi_lagrangian_update(x_vel, v_vel, DT)
         x_vel = component.sample_at(x_vel)
@@ -57,7 +52,7 @@ for i in range(STEPS):
     VELOCITY = VELOCITY.with_data(x_vel_list)
 
     VELOCITY += buoyancy(DENSITY, 9.81, FLOW.buoyancy_factor)
-    VELOCITY = divergence_free(VELOCITY, FLOW.domain, obstacles=())
+    VELOCITY = divergence_free(VELOCITY, FLOW.domain, obstacles=(), pressure_solver=SparseCG(max_iterations=100))
 
     if SAVE_IMAGE:
         utils.save_img(DENSITY.data, 10000., IMG_PATH + "/torch_%04d.png" % i)
@@ -76,5 +71,4 @@ for i in range(STEPS):
         plt.pause(0.00001)
         plt.close(fig)
 
-
-    print("Step %d done: means %s %s" % (i, np.mean(DENSITY.data), np.mean(VELOCITY.staggered_tensor())))
+    print("Step Done: ", i, " Means: ", x_rho.mean(), ", ", VELOCITY.staggered_tensor().mean())
