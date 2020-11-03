@@ -9,3 +9,4 @@ images/*
 data/*
 .cache
 run_tests.sh
+build

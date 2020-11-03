@@ -1,19 +1,29 @@
 import numpy as np
+from numba import cuda
 
+@cuda.jit
 def initialize_data_2d(data, res):
-    data[..., (res // 10 * 1):(res // 10 * 3), (res // 6 * 2):(res // 6 * 3), 0] = -0.5
-    return data
+    i, j = cuda.grid(2)
+
+    if i < 128 and j < 128:
+        if i >= (res // 10 * 1) and i < (res // 10 * 3):
+            if j >= (res // 6 * 2) and j < (res // 6 * 3):
+                data[0, i, j, 0] = -0.5
 
 def initialize_data_3d(data, res):
-    data[..., (res // 4 * 2):(res // 4 * 3), (res // 4 * 1):(res // 4 * 3), (res // 4):(res // 4 * 3), 0] = -1.0
+    data[0, (res // 4 * 2):(res // 4 * 3), (res // 4 * 1):(res // 4 * 3), (res // 4):(res // 4 * 3), 0] = -1.0
     return data
 
 def semi_lagrangian_update(x, v, dt):
     x_new = x - v*dt
     return x_new
 
+@cuda.jit
 def patch_inflow(inflow_tensor, x, dt):
-    return x + inflow_tensor * dt
+    i, j = cuda.grid(2)
+
+    if i < 128 and j < 128:
+        x[0, i, j, 0] += inflow_tensor[0, i, j, 0] * dt
 
 from PIL import Image
 

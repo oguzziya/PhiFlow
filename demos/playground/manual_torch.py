@@ -1,6 +1,15 @@
 from phi.torch.flow import *
 import utils
 import matplotlib.pyplot as plt
+import torch
+
+from numba import cuda
+
+RUN_GPU = True
+device = "cpu"
+
+if RUN_GPU:
+    device = "cuda:0"
 
 DIM = 2
 BATCH_SIZE = 1
@@ -8,8 +17,10 @@ STEPS = 10
 RES = 128
 DT = 0.6
 
+DT = np.float32(DT)
+
 SAVE_IMAGE = False
-ANIMATE = False
+ANIMATE = True
 
 if SAVE_IMAGE:
     IMG_PATH = os.path.expanduser("~/Simulations/phi/data/manual/torch")
@@ -22,21 +33,45 @@ FLOW_TORCH = torch_from_numpy(FLOW)
 DENSITY = FLOW_TORCH.density
 VELOCITY = FLOW_TORCH.velocity
 
+threads_per_block = (16, 16)
+blocks_per_grid = (int(RES / threads_per_block[0]), int(RES / threads_per_block[1]))
+
+inflow_tensor_numba = None
+inflow_tensor = None
+
 if DIM == 2:
     density_shape = [1, RES, RES, 1]
-    inflow_tensor = torch.zeros(size=density_shape)
-    inflow_tensor = utils.initialize_data_2d(inflow_tensor, RES)
+    if RUN_GPU:
+        inflow_tensor = torch.zeros(size=density_shape)
+        inflow_tensor_numba = cuda.as_cuda_array(inflow_tensor.to(device))
+        utils.initialize_data_2d[blocks_per_grid, threads_per_block](inflow_tensor_numba, RES)
+    else:
+        inflow_tensor = torch.zeros(size=density_shape)
+        inflow_tensor = utils.initialize_data_2d(inflow_tensor, RES)
 else:
     density_shape = [1, RES, RES, RES, 1]
-    inflow_tensor = torch.zeros(size=density_shape)
-    inflow_tensor = utils.initialize_data_3d(inflow_tensor, RES)
+    if RUN_GPU:
+        inflow_tensor = torch.zeros(size=density_shape)
+        inflow_tensor_numba = cuda.as_cuda_array(inflow_tensor.to(device))
+        utils.initialize_data_3d[blocks_per_grid, threads_per_block](inflow_tensor_numba, RES)
+    else:
+        inflow_tensor = torch.zeros(size=density_shape)
+        inflow_tensor = utils.initialize_data_3d(inflow_tensor, RES)
 
 for i in range(STEPS):
     x_rho = torch_from_numpy(DENSITY.points.data)
+
     v_rho = VELOCITY.sample_at(x_rho)
     x_rho = utils.semi_lagrangian_update(x_rho, v_rho, DT)
     x_rho = DENSITY.sample_at(x_rho)
-    x_rho = utils.patch_inflow(inflow_tensor, x_rho, DT)
+
+    if RUN_GPU:
+        x_rho_gpu = x_rho.to(device)
+        x_rho_numba = cuda.as_cuda_array(x_rho_gpu)
+        utils.patch_inflow[blocks_per_grid, threads_per_block](inflow_tensor_numba, x_rho_numba, DT)
+        x_rho = torch_from_numpy(x_rho_numba.copy_to_host())
+    else:
+        x_rho = utils.patch_inflow(inflow_tensor, x_rho, DT)
 
     x_vel_list = []
 
@@ -52,6 +87,7 @@ for i in range(STEPS):
     VELOCITY = VELOCITY.with_data(x_vel_list)
 
     VELOCITY += buoyancy(DENSITY, 9.81, FLOW.buoyancy_factor)
+
     VELOCITY = divergence_free(VELOCITY, FLOW.domain, obstacles=(), pressure_solver=SparseCG(max_iterations=100))
 
     if SAVE_IMAGE:
@@ -68,7 +104,7 @@ for i in range(STEPS):
         fig = plt.figure()
         ax = fig.add_subplot(1, 1, 1)
         ax.contourf(ima, cmap='inferno')
-        plt.pause(0.00001)
+        plt.pause(0.5)
         plt.close(fig)
 
-    print("Step Done: ", i, " Means: ", x_rho.mean(), ", ", VELOCITY.staggered_tensor().mean())
+    print("Step Done: ", i, " Means: ", DENSITY.data.mean(), ", ", VELOCITY.staggered_tensor().mean())
