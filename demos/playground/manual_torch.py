@@ -1,4 +1,4 @@
-from phi.torch.flow import *
+from phi.flow import *
 import matplotlib.pyplot as plt
 import torch
 import time
@@ -51,10 +51,8 @@ for RES in resolutions:
             inflow_patch_percentage_cpu[RES] = []
 
         FLOW = Fluid(Domain([RES] * DIM, boundaries=OPEN), batch_size=BATCH_SIZE, buoyancy_factor=0.2)
-        FLOW_TORCH = torch_from_numpy(FLOW)
-
-        DENSITY = FLOW_TORCH.density
-        VELOCITY = FLOW_TORCH.velocity
+        DENSITY = FLOW.density
+        VELOCITY = FLOW.velocity
 
         threads_per_block = None
         blocks_per_grid = None
@@ -72,29 +70,28 @@ for RES in resolutions:
         if DIM == 2:
             density_shape = [1, RES, RES, 1]
             if RUN_GPU:
-                inflow_tensor = torch.zeros(size=density_shape)
-                inflow_tensor_numba = cuda.as_cuda_array(inflow_tensor.to(device))
+                inflow_tensor = np.zeros(shape=density_shape)
+                inflow_tensor_numba = cuda.to_device(inflow_tensor)
                 utils.initialize_data_2d[blocks_per_grid, threads_per_block](inflow_tensor_numba, RES)
             else:
-                inflow_tensor = torch.zeros(size=density_shape)
+                inflow_tensor = np.zeros(shape=density_shape)
                 inflow_tensor = utils.initialize_data_2d(inflow_tensor, RES)
         else:
             density_shape = [1, RES, RES, RES, 1]
             if RUN_GPU:
-                inflow_tensor = torch.zeros(size=density_shape)
-                inflow_tensor_numba = cuda.as_cuda_array(inflow_tensor.to(device))
+                inflow_tensor = np.zeros(shape=density_shape)
+                inflow_tensor_numba = cuda.to_device(inflow_tensor)
                 utils.initialize_data_3d[blocks_per_grid, threads_per_block](inflow_tensor_numba, RES)
             else:
-                inflow_tensor = torch.zeros(size=density_shape)
+                inflow_tensor = np.zeros(shape=density_shape)
                 inflow_tensor = utils.initialize_data_3d(inflow_tensor, RES)
-
 
         for i in range(STEPS):
             start = time.time()
             sample_counter = 0.0
             advection_counter = 0.0
 
-            x_rho = torch_from_numpy(DENSITY.points.data)
+            x_rho = DENSITY.points.data
 
             sample_start = time.time()
             v_rho = VELOCITY.sample_at(x_rho)
@@ -103,15 +100,14 @@ for RES in resolutions:
 
             advection_start = time.time()
             if RUN_GPU:
-                x_rho_gpu = x_rho.to(device)
-                x_rho_numba = cuda.as_cuda_array(x_rho_gpu)
-                v_rho_gpu = v_rho.to(device)
-                v_rho_numba = cuda.as_cuda_array(v_rho_gpu)
+                x_rho_numba = cuda.to_device(x_rho)
+                v_rho_numba = cuda.to_device(v_rho)
                 if DIM == 2:
                     utils.semi_lagrangian_update2d[blocks_per_grid, threads_per_block](x_rho_numba, v_rho_numba, DT, RES)
                 else:
                     utils.semi_lagrangian_update3d[blocks_per_grid, threads_per_block](x_rho_numba, v_rho_numba, DT)
-                x_rho = x_rho_gpu.to("cpu")
+                x_rho = np.array(x_rho_numba.copy_to_host())
+
             else:
                 x_rho = utils.semi_lagrangian_update(x_rho, v_rho, DT)
             advection_end = time.time()
@@ -124,13 +120,12 @@ for RES in resolutions:
 
             inflow_patch_start = time.time()
             if RUN_GPU:
-                x_rho_gpu = x_rho.to(device)
-                x_rho_numba = cuda.as_cuda_array(x_rho_gpu)
+                x_rho_numba = cuda.to_device(x_rho)
                 if DIM == 2:
                     utils.patch_inflow2d[blocks_per_grid, threads_per_block](inflow_tensor_numba, x_rho_numba, DT, RES)
                 else:
                     utils.patch_inflow3d[blocks_per_grid, threads_per_block](inflow_tensor_numba, x_rho_numba, DT)
-                x_rho = x_rho_gpu.to("cpu")
+                x_rho = np.array(x_rho_numba.copy_to_host())
             else:
                 x_rho = utils.patch_inflow(inflow_tensor, x_rho, DT)
             inflow_patch_end = time.time()
@@ -139,7 +134,7 @@ for RES in resolutions:
             x_vel_list = []
 
             for component in VELOCITY.unstack():
-                x_vel = torch_from_numpy(component.points.data)
+                x_vel =component.points.data
 
                 sample_start = time.time()
                 v_vel = VELOCITY.sample_at(x_vel)
@@ -148,15 +143,13 @@ for RES in resolutions:
 
                 advection_start = time.time()
                 if RUN_GPU:
-                    x_vel_gpu = x_vel.to(device)
-                    x_vel_numba = cuda.as_cuda_array(x_vel_gpu)
-                    v_vel_gpu = v_vel.to(device)
-                    v_vel_numba = cuda.as_cuda_array(v_vel_gpu)
+                    x_vel_numba = cuda.to_device(x_vel)
+                    v_vel_numba = cuda.to_device(v_vel)
                     if DIM == 2:
                         utils.semi_lagrangian_update2d[blocks_per_grid, threads_per_block](x_vel_numba, v_vel_numba, DT, RES)
                     else:
                         utils.semi_lagrangian_update3d[blocks_per_grid, threads_per_block](x_vel_numba, v_vel_numba, DT)
-                    x_vel = x_vel_gpu.to("cpu")
+                    x_vel = np.array(x_vel_numba.copy_to_host())
                 else:
                     x_vel = utils.semi_lagrangian_update(x_vel, v_vel, DT)
                 advection_end = time.time()
