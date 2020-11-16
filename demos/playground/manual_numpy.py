@@ -29,7 +29,7 @@ advection_percentage_gpu = {}
 sampling_percentage_gpu = {}
 inflow_patch_percentage_gpu = {}
 
-resolutions = [32, 64, 128, 256, 512, 1024]
+resolutions = [32, 64, 128, 256, 512, 1024, 2056]
 
 for RUN_GPU in [False, True]:
     for RES in resolutions:
@@ -99,32 +99,29 @@ for RUN_GPU in [False, True]:
 
             advection_start = time.time()
             if RUN_GPU:
-                x_rho_numba = cuda.to_device(x_rho)
-                v_rho_numba = cuda.to_device(v_rho)
+                x_rho = cuda.to_device(x_rho)
+                v_rho = cuda.to_device(v_rho)
                 if DIM == 2:
-                    utils.semi_lagrangian_update2d[blocks_per_grid, threads_per_block](x_rho_numba, v_rho_numba, DT, RES)
+                    utils.semi_lagrangian_update2d[blocks_per_grid, threads_per_block](x_rho, v_rho, DT, RES)
                 else:
-                    utils.semi_lagrangian_update3d[blocks_per_grid, threads_per_block](x_rho_numba, v_rho_numba, DT, RES)
-                x_rho = np.asarray(x_rho_numba.copy_to_host())
-
+                    utils.semi_lagrangian_update3d[blocks_per_grid, threads_per_block](x_rho, v_rho, DT, RES)
             else:
                 x_rho = utils.semi_lagrangian_update(x_rho, v_rho, DT)
             advection_end = time.time()
             advection_counter += advection_end - advection_start
 
             sample_start = time.time()
-            x_rho = DENSITY.sample_at(x_rho)
+            x_rho = DENSITY.sample_at(np.asarray(x_rho))
             sample_end = time.time()
             sample_counter += sample_end - sample_start
 
             inflow_patch_start = time.time()
             if RUN_GPU:
-                x_rho_numba = cuda.to_device(x_rho)
+                x_rho = cuda.to_device(x_rho)
                 if DIM == 2:
-                    utils.patch_inflow2d[blocks_per_grid, threads_per_block](inflow_tensor_numba, x_rho_numba, DT, RES)
+                    utils.patch_inflow2d[blocks_per_grid, threads_per_block](inflow_tensor_numba, x_rho, DT, RES)
                 else:
-                    utils.patch_inflow3d[blocks_per_grid, threads_per_block](inflow_tensor_numba, x_rho_numba, DT, RES)
-                x_rho = np.asarray(x_rho_numba.copy_to_host())
+                    utils.patch_inflow3d[blocks_per_grid, threads_per_block](inflow_tensor_numba, x_rho, DT, RES)
             else:
                 x_rho = utils.patch_inflow(inflow_tensor, x_rho, DT)
             inflow_patch_end = time.time()
@@ -133,7 +130,7 @@ for RUN_GPU in [False, True]:
             x_vel_list = []
 
             for component in VELOCITY.unstack():
-                x_vel =component.points.data
+                x_vel = component.points.data
 
                 sample_start = time.time()
                 v_vel = VELOCITY.sample_at(x_vel)
@@ -142,28 +139,27 @@ for RUN_GPU in [False, True]:
 
                 advection_start = time.time()
                 if RUN_GPU:
-                    x_vel_numba = cuda.to_device(x_vel)
-                    v_vel_numba = cuda.to_device(v_vel)
+                    x_vel = cuda.to_device(x_vel)
+                    v_vel = cuda.to_device(v_vel)
                     if DIM == 2:
-                        utils.semi_lagrangian_update2d[blocks_per_grid, threads_per_block](x_vel_numba, v_vel_numba, DT, RES)
+                        utils.semi_lagrangian_update2d[blocks_per_grid, threads_per_block](x_vel, v_vel, DT, RES)
                     else:
-                        utils.semi_lagrangian_update3d[blocks_per_grid, threads_per_block](x_vel_numba, v_vel_numba, DT, RES)
-                    x_vel = np.asarray(x_vel_numba.copy_to_host())
+                        utils.semi_lagrangian_update3d[blocks_per_grid, threads_per_block](x_vel, v_vel, DT, RES)
                 else:
                     x_vel = utils.semi_lagrangian_update(x_vel, v_vel, DT)
                 advection_end = time.time()
                 advection_counter += advection_end - advection_start
 
                 sample_start = time.time()
-                x_vel = component.sample_at(x_vel)
+                x_vel = component.sample_at(np.asarray(x_vel))
                 sample_end = time.time()
                 sample_counter += sample_end - sample_start
 
                 x_vel_list.append(x_vel)
 
             # Update the object data
-            DENSITY = DENSITY.with_data(x_rho)
-            VELOCITY = VELOCITY.with_data(x_vel_list)
+            DENSITY = DENSITY.with_data(np.asarray(x_rho))
+            VELOCITY = VELOCITY.with_data([np.asarray(component) for component in x_vel_list])
 
             VELOCITY += buoyancy(DENSITY, 9.81, FLOW.buoyancy_factor)
 
