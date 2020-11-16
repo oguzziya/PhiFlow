@@ -12,10 +12,11 @@ def initialize_data_2d(data, res):
 @cuda.jit
 def initialize_data_3d(data, res):
     i, j, k = cuda.grid(3)
-    if i >= (res // 4 * 2) and i < (res // 4 * 3):
-        if j >= (res // 4 * 1) and j < (res // 4 * 3):
-            if k >= (res // 4) and k < (res // 4 * 3):
-                data[0, i, j, k, 0] = -1.0
+    if i < res and j < res and k < res:
+        if i >= (res // 4 * 2) and i < (res // 4 * 3):
+            if j >= (res // 4 * 1) and j < (res // 4 * 3):
+                if k >= (res // 4) and k < (res // 4 * 3):
+                    data[0, i, j, k, 0] = -1.0
 
 def semi_lagrangian_update(x, v, dt):
     x -= v*dt
@@ -29,22 +30,26 @@ def semi_lagrangian_update2d(x, v, dt, res):
         x[0, i, j, 1] -= v[0, i, j, 1] * dt
 
 @cuda.jit
-def semi_lagrangian_update3d(x, v, dt):
+def semi_lagrangian_update3d(x, v, dt, res):
     i, j, k = cuda.grid(3)
-    x[0, i, j, k, 0] -= v[0, i, j, k, 0] * dt
-    x[0, i, j, k, 1] -= v[0, i, j, k, 1] * dt
-    x[0, i, j, k, 2] -= v[0, i, j, k, 2] * dt
+    if i < res and j < res and k < res:
+        x[0, i, j, k, 0] -= v[0, i, j, k, 0] * dt
+        x[0, i, j, k, 1] -= v[0, i, j, k, 1] * dt
+        x[0, i, j, k, 2] -= v[0, i, j, k, 2] * dt
 
 @cuda.jit
 def patch_inflow2d(inflow_tensor, x, dt, res):
     i, j = cuda.grid(2)
     if i < res and j < res:
         x[0, i, j, 0] += inflow_tensor[0, i, j, 0] * dt
+        
+        
 
 @cuda.jit
-def patch_inflow3d(inflow_tensor, x, dt):
+def patch_inflow3d(inflow_tensor, x, dt, res):
     i, j, k = cuda.grid(3)
-    x[0, i, j, k, 0] += inflow_tensor[0, i, j, k, 0] * dt
+    if i < res and j < res and k < res:
+        x[0, i, j, k, 0] += inflow_tensor[0, i, j, k, 0] * dt
 
 from PIL import Image
 
