@@ -9,7 +9,7 @@ device = "cpu"
 SAVE_IMAGE = False
 ANIMATE = False
 
-DIM = 3
+DIM = 2
 BATCH_SIZE = 1
 STEPS = 20
 DT = 0.6
@@ -31,9 +31,8 @@ inflow_patch_percentage_gpu = {}
 
 resolutions = [32, 64, 128, 256, 512, 1024]
 
-for RES in resolutions:
-    for RUN_GPU in [False, True]:
-
+for RUN_GPU in [False, True]:
+    for RES in resolutions:
         if RUN_GPU:
             device = "cuda:0"
             import utils_gpu as utils
@@ -106,7 +105,7 @@ for RES in resolutions:
                     utils.semi_lagrangian_update2d[blocks_per_grid, threads_per_block](x_rho_numba, v_rho_numba, DT, RES)
                 else:
                     utils.semi_lagrangian_update3d[blocks_per_grid, threads_per_block](x_rho_numba, v_rho_numba, DT, RES)
-                x_rho = np.array(x_rho_numba.copy_to_host())
+                x_rho = np.asarray(x_rho_numba.copy_to_host())
 
             else:
                 x_rho = utils.semi_lagrangian_update(x_rho, v_rho, DT)
@@ -125,7 +124,7 @@ for RES in resolutions:
                     utils.patch_inflow2d[blocks_per_grid, threads_per_block](inflow_tensor_numba, x_rho_numba, DT, RES)
                 else:
                     utils.patch_inflow3d[blocks_per_grid, threads_per_block](inflow_tensor_numba, x_rho_numba, DT, RES)
-                x_rho = np.array(x_rho_numba.copy_to_host())
+                x_rho = np.asarray(x_rho_numba.copy_to_host())
             else:
                 x_rho = utils.patch_inflow(inflow_tensor, x_rho, DT)
             inflow_patch_end = time.time()
@@ -149,7 +148,7 @@ for RES in resolutions:
                         utils.semi_lagrangian_update2d[blocks_per_grid, threads_per_block](x_vel_numba, v_vel_numba, DT, RES)
                     else:
                         utils.semi_lagrangian_update3d[blocks_per_grid, threads_per_block](x_vel_numba, v_vel_numba, DT, RES)
-                    x_vel = np.array(x_vel_numba.copy_to_host())
+                    x_vel = np.asarray(x_vel_numba.copy_to_host())
                 else:
                     x_vel = utils.semi_lagrangian_update(x_vel, v_vel, DT)
                 advection_end = time.time()
