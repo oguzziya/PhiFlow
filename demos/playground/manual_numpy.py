@@ -24,12 +24,14 @@ if SAVE_IMAGE:
 advection_percentage_cpu = {}
 sampling_percentage_cpu = {}
 inflow_patch_percentage_cpu = {}
+total_time_cpu = {}
 
 advection_percentage_gpu = {}
 sampling_percentage_gpu = {}
 inflow_patch_percentage_gpu = {}
+total_time_gpu = {}
 
-resolutions = [32, 64, 128, 256, 512, 1024, 2056]
+resolutions = [32, 64, 128, 256, 512, 1024, 2048]
 
 for RUN_GPU in [False, True]:
     for RES in resolutions:
@@ -44,10 +46,12 @@ for RUN_GPU in [False, True]:
             advection_percentage_gpu[RES] = []
             sampling_percentage_gpu[RES] = []
             inflow_patch_percentage_gpu[RES] = []
+            total_time_gpu[RES] = []
         else:
             advection_percentage_cpu[RES] = []
             sampling_percentage_cpu[RES] = []
             inflow_patch_percentage_cpu[RES] = []
+            total_time_cpu[RES] = []
 
         FLOW = Fluid(Domain([RES] * DIM, boundaries=OPEN), batch_size=BATCH_SIZE, buoyancy_factor=0.2)
         DENSITY = FLOW.density
@@ -195,10 +199,12 @@ for RUN_GPU in [False, True]:
                 advection_percentage_gpu[RES].append(advection_counter)
                 sampling_percentage_gpu[RES].append(sample_counter)
                 inflow_patch_percentage_gpu[RES].append(inflow_patch_time)
+                total_time_gpu[RES].append(total_time)
             else:
                 advection_percentage_cpu[RES].append(advection_counter)
                 sampling_percentage_cpu[RES].append(sample_counter)
                 inflow_patch_percentage_cpu[RES].append(inflow_patch_time)
+                total_time_cpu[RES].append(total_time)
 
             print("-------------------------------------------------------------------------------------")
             print("Step", i, "executed in", total_time, "seconds with GPU", RUN_GPU)
@@ -211,47 +217,47 @@ for RUN_GPU in [False, True]:
 advection_percentage_means_gpu = []
 sampling_percentage_means_gpu = []
 inflow_patch_percentage_means_gpu = []
+total_time_means_gpu = []
 
 advection_percentage_means_cpu = []
 sampling_percentage_means_cpu = []
 inflow_patch_percentage_means_cpu = []
-
-advection_percentage_std_gpu = []
-sampling_percentage_std_gpu = []
-inflow_patch_percentage_std_gpu = []
-
-advection_percentage_std_cpu = []
-sampling_percentage_std_cpu = []
-inflow_patch_percentage_std_cpu = []
-
-plt.rcParams["font.family"] = "Cambria Math"
+total_time_means_cpu = []
 
 for res in resolutions:
     advection_percentage_means_gpu.append(np.mean(advection_percentage_gpu[res]))
     sampling_percentage_means_gpu.append(np.mean(sampling_percentage_gpu[res]))
     inflow_patch_percentage_means_gpu.append(np.mean(inflow_patch_percentage_gpu[res]))
+    total_time_means_gpu.append(np.mean(total_time_gpu[res]))
 
     advection_percentage_means_cpu.append(np.mean(advection_percentage_cpu[res]))
     sampling_percentage_means_cpu.append(np.mean(sampling_percentage_cpu[res]))
     inflow_patch_percentage_means_cpu.append(np.mean(inflow_patch_percentage_cpu[res]))
+    total_time_means_cpu.append(np.mean(total_time_cpu[res]))
 
-    advection_percentage_std_gpu.append(np.std(advection_percentage_gpu[res]))
-    sampling_percentage_std_gpu.append(np.std(sampling_percentage_gpu[res]))
-    inflow_patch_percentage_std_gpu.append(np.std(inflow_patch_percentage_gpu[res]))
 
-    advection_percentage_std_cpu.append(np.std(advection_percentage_cpu[res]))
-    sampling_percentage_std_cpu.append(np.std(sampling_percentage_cpu[res]))
-    inflow_patch_percentage_std_cpu.append(np.std(inflow_patch_percentage_cpu[res]))
+fig, (ax1, ax2) = plt.subplots(2,1)
 
-advection_plot_gpu = plt.plot(resolutions, advection_percentage_means_gpu, label="Advection Patching - GPU", marker="o", linestyle="-")
-inflow_plot_gpu = plt.plot(resolutions, inflow_patch_percentage_means_gpu, label="Inflow Patching - GPU", marker="x", linestyle="-")
-advection_plot_cpu = plt.plot(resolutions, advection_percentage_means_cpu, label="Advection Patching - CPU", marker="*", linestyle="-")
-inflow_plot_cpu = plt.plot(resolutions, inflow_patch_percentage_means_cpu, label="Inflow Patching - CPU", marker="h", linestyle="-")
-plt.xticks(resolutions)
-plt.grid()
-plt.xlabel("Resolution", fontsize=18)
-plt.ylabel("Time (s)", fontsize=18)
-plt.title("Resolution vs Time for GPU and CPU execution per Time Step", fontsize=24)
+advection_plot_gpu = ax1.plot(resolutions, advection_percentage_means_gpu, label="Advection Patching - GPU", marker="o", linestyle="-")
+inflow_plot_gpu = ax1.plot(resolutions, inflow_patch_percentage_means_gpu, label="Inflow Patching - GPU", marker="x", linestyle="-")
+advection_plot_cpu = ax1.plot(resolutions, advection_percentage_means_cpu, label="Advection Patching - CPU", marker="*", linestyle="-")
+inflow_plot_cpu = ax1.plot(resolutions, inflow_patch_percentage_means_cpu, label="Inflow Patching - CPU", marker="h", linestyle="-")
+ax1.grid()
+ax1.set_xticks(resolutions)
+ax1.set_xlabel("Resolution", fontsize=12)
+ax1.set_ylabel("Time (s)", fontsize=12)
+ax1.set_ylim([0.0, 0.1])
+ax1.set_title("Execution Time per Time Step - 2D - NumPy-Numba", fontsize=12)
+ax1.legend()
 
-plt.legend()
+total_time_cpu = ax2.plot(resolutions, total_time_means_cpu, label="Total Time - CPU", marker="o", linestyle="-")
+total_time_gpu = ax2.plot(resolutions, total_time_means_gpu, label="Total Time - GPU", marker="x", linestyle="-")
+ax2.grid()
+ax2.set_xticks(resolutions)
+ax2.set_xlabel("Resolution", fontsize=12)
+ax2.set_ylabel("Time (s)", fontsize=12)
+ax2.set_ylim([0.0, 7])
+ax2.set_title("Total Execution Time per Time Step - 2D - NumPy-Numba", fontsize=12)
+ax2.legend()
+
 plt.show()
