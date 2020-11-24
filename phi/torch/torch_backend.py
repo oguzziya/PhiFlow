@@ -9,6 +9,7 @@ import torch.nn.functional as torchf
 from phi.backend.backend import Backend
 from phi.backend.backend_helper import split_multi_mode_pad, PadSettings, general_grid_sample_nd, combined_dim, symmetric_pad
 from phi.backend.scipy_backend import SciPyBackend
+from phi.backend.tensorop import collapsed_gather_nd
 
 
 class TorchBackend(Backend):
@@ -85,12 +86,41 @@ class TorchBackend(Backend):
         result = channels_last(result)
         return result
 
-    def resample(self, inputs, sample_coords, interpolation='linear', boundary='constant', constant_values=0):
+    def resample(self, inputs, sample_coords, interpolation='linear', boundary='constant', constant_values=0, device='cpu'):
         assert interpolation == 'linear'
         assert constant_values == 0
         inputs = self.as_tensor(inputs)
         sample_coords = self.as_tensor(sample_coords)
-        return general_grid_sample_nd(inputs, sample_coords, boundary, constant_values, self)
+
+        if device is not 'cpu':
+            ZERO = 0
+            REPLICATE = 1
+            CIRCULAR = 2
+            SYMMETRIC = 3
+            REFLECT = 4
+            shape = inputs.shape
+            dims = len(shape) - 2
+            boundary_array = np.zeros((dims, 2), np.int32)
+            for i in range(dims):
+                for j in range(2):
+                    current_boundary = collapsed_gather_nd(boundary, [i, j]).lower()
+                    if current_boundary == 'zero' or current_boundary == 'constant':
+                        boundary_array[i, j] = ZERO
+                    elif current_boundary == 'replicate':
+                        boundary_array[i, j] = REPLICATE
+                    elif current_boundary == 'circular' or current_boundary == 'wrap':
+                        boundary_array[i, j] = CIRCULAR
+                    elif current_boundary == 'symmetric':
+                        boundary_array[i, j] = SYMMETRIC
+                    elif current_boundary == 'reflect':
+                        boundary_array[i, j] = REFLECT
+
+            boundary_array = torch.as_tensor(boundary_array)
+            import resample_torch_cuda
+            return resample_torch_cuda.resample_op(inputs.to(device), sample_coords.to(device), boundary_array.to(device))
+        else:
+            return general_grid_sample_nd(inputs, sample_coords, boundary, constant_values, self)
+
         # return self._native_resample(inputs, sample_coords, interpolation, boundary)
 
     def _native_resample(self, inputs, sample_coords, interpolation='linear', boundary='constant'):

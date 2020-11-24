@@ -10,7 +10,7 @@ ANIMATE = False
 
 DIM = 2
 BATCH_SIZE = 1
-STEPS = 20
+STEPS = 5
 DT = 0.6
 
 DT = np.float32(DT)
@@ -35,10 +35,11 @@ resolutions = [32, 64, 128, 256, 512, 1024, 2048]
 for RUN_GPU in [False, True]:
     for RES in resolutions:
         if RUN_GPU:
-            device = "cuda:0"
+            device = 'cuda:0'
             import utils_gpu as utils
             from numba import cuda
         else:
+            device = 'cpu'
             import utils as utils
 
         if RUN_GPU:
@@ -99,7 +100,7 @@ for RUN_GPU in [False, True]:
             x_rho = torch_from_numpy(DENSITY.points.data)
 
             sample_start = time.time()
-            v_rho = VELOCITY.sample_at(x_rho)
+            v_rho = VELOCITY.sample_at(x_rho, device=device)
             sample_end = time.time()
             sample_counter += sample_end - sample_start
 
@@ -120,7 +121,7 @@ for RUN_GPU in [False, True]:
             advection_counter += advection_end - advection_start
 
             sample_start = time.time()
-            x_rho = DENSITY.sample_at(x_rho)
+            x_rho = DENSITY.sample_at(x_rho, device)
             sample_end = time.time()
             sample_counter += sample_end - sample_start
 
@@ -144,7 +145,7 @@ for RUN_GPU in [False, True]:
                 x_vel = torch_from_numpy(component.points.data)
 
                 sample_start = time.time()
-                v_vel = VELOCITY.sample_at(x_vel)
+                v_vel = VELOCITY.sample_at(x_vel, device)
                 sample_end = time.time()
                 sample_counter += sample_end - sample_start
 
@@ -165,7 +166,7 @@ for RUN_GPU in [False, True]:
                 advection_counter += advection_end - advection_start
 
                 sample_start = time.time()
-                x_vel = component.sample_at(x_vel)
+                x_vel = component.sample_at(x_vel, device)
                 sample_end = time.time()
                 sample_counter += sample_end - sample_start
 
@@ -249,13 +250,14 @@ fig, (ax1, ax2) = plt.subplots(2,1)
 
 advection_plot_gpu = ax1.plot(resolutions, advection_percentage_means_gpu, label="Advection Patching - GPU", marker="o", linestyle="-")
 inflow_plot_gpu = ax1.plot(resolutions, inflow_patch_percentage_means_gpu, label="Inflow Patching - GPU", marker="x", linestyle="-")
+sampling_plot_gpu = ax1.plot(resolutions, sampling_percentage_means_gpu, label="Sampling - GPU", marker="x", linestyle="-")
 advection_plot_cpu = ax1.plot(resolutions, advection_percentage_means_cpu, label="Advection Patching - CPU", marker="*", linestyle="-")
 inflow_plot_cpu = ax1.plot(resolutions, inflow_patch_percentage_means_cpu, label="Inflow Patching - CPU", marker="h", linestyle="-")
+sampling_plot_cpu = ax1.plot(resolutions, sampling_percentage_means_cpu, label="Sampling - CPU", marker="h", linestyle="-")
 ax1.grid()
 ax1.set_xticks(resolutions)
 ax1.set_xlabel("Resolution", fontsize=12)
 ax1.set_ylabel("Time (s)", fontsize=12)
-ax1.set_ylim([0.0, 0.1])
 ax1.set_title("Execution Time per Time Step - 2D - PyTorch-Numba", fontsize=12)
 ax1.legend()
 

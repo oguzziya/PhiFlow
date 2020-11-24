@@ -133,8 +133,8 @@ class StaggeredGrid(Field):
     def extrapolation_value(self, value):
         return collapse(value)
 
-    def sample_at(self, points):
-        return math.concat([component.sample_at(points) for component in self.data], axis=-1)
+    def sample_at(self, points, device='cpu'):
+        return math.concat([component.sample_at(points, device=device) for component in self.data], axis=-1)
 
     def at(self, other_field):
         if isinstance(other_field, StaggeredGrid) and other_field.box == self.box and np.allclose(other_field.resolution, self.resolution):
