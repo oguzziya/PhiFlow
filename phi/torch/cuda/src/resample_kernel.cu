@@ -346,9 +346,6 @@ void LaunchResampleKernel(
 	const Boundary* __restrict__ boundaries
 ) {
 
-    float* outputDevice;
-    cudaMalloc(&outputDevice, sizeof(float)*outputSize);
-
 	// Run kernel with texture memory 
 	/*if (dims <= 3 && components <= 4){
 	    if((dims == 1 && dimSizes[0] <= 8192)||
@@ -365,7 +362,7 @@ void LaunchResampleKernel(
                 outputSize,
                 data,
                 points,
-                outputDevice,
+                output,
                 boundaries
             );
             return;
@@ -396,17 +393,15 @@ void LaunchResampleKernel(
 		outputSize,
 		data,
 		points,
-		outputDevice,
+		output,
 		boundaries,
 		q
 	);
 
 	HANDLE_ERROR(cudaDeviceSynchronize());
 
-	cudaMemcpy(output, outputDevice, sizeof(float)*outputSize, cudaMemcpyDeviceToHost);
 	HANDLE_ERROR(cudaFree(dimSizesDevice));
 	HANDLE_ERROR(cudaFree(q));
-	HANDLE_ERROR(cudaFree(outputDevice));
 }
 
 }  // end namespace to

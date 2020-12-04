@@ -2,15 +2,16 @@ from phi.torch.flow import *
 import matplotlib.pyplot as plt
 import torch
 import time
-
+from resample_torch_cuda import resample_op
+from copy import copy
 IS_PRESSURE = False
 device = "cpu"
 SAVE_IMAGE = False
-ANIMATE = False
+ANIMATE = True
 
-DIM = 2
+DIM = 3
 BATCH_SIZE = 1
-STEPS = 5
+STEPS = 10
 DT = 0.6
 
 DT = np.float32(DT)
@@ -20,255 +21,279 @@ if SAVE_IMAGE:
     if not os.path.exists(IMG_PATH):
         os.makedirs(IMG_PATH)
 
-advection_percentage_cpu = {}
-sampling_percentage_cpu = {}
-inflow_patch_percentage_cpu = {}
-total_time_cpu = {}
-
-advection_percentage_gpu = {}
-sampling_percentage_gpu = {}
-inflow_patch_percentage_gpu = {}
-total_time_gpu = {}
-
-resolutions = [32, 64, 128, 256, 512, 1024, 2048]
-
-for RUN_GPU in [False, True]:
+resolutions = [32,]
+for RUN_GPU in [True]:
     for RES in resolutions:
-        if RUN_GPU:
-            device = 'cuda:0'
-            import utils_gpu as utils
-            from numba import cuda
-        else:
-            device = 'cpu'
-            import utils as utils
-
-        if RUN_GPU:
-            advection_percentage_gpu[RES] = []
-            sampling_percentage_gpu[RES] = []
-            inflow_patch_percentage_gpu[RES] = []
-            total_time_gpu[RES] = []
-        else:
-            advection_percentage_cpu[RES] = []
-            sampling_percentage_cpu[RES] = []
-            inflow_patch_percentage_cpu[RES] = []
-            total_time_cpu[RES] = []
-
         FLOW = Fluid(Domain([RES] * DIM, boundaries=OPEN), batch_size=BATCH_SIZE, buoyancy_factor=0.2)
         FLOW_TORCH = torch_from_numpy(FLOW)
 
         DENSITY = FLOW_TORCH.density
         VELOCITY = FLOW_TORCH.velocity
 
-        threads_per_block = None
-        blocks_per_grid = None
+        if RUN_GPU:
+            device = 'cuda:0'
+            import utils_gpu as utils
+            from numba import cuda
 
-        if DIM == 2:
-            threads_per_block = (min(RES, 32), min(RES, 32))
-            blocks_per_grid = (int(np.ceil(RES / threads_per_block[0])), int(np.ceil(RES / threads_per_block[1])))
-        else:
-            threads_per_block = (8, 8, 8)
-            blocks_per_grid = (int(RES / threads_per_block[0]), int(RES / threads_per_block[1]), int(RES / threads_per_block[2]))
+            # Set the GPU threads
+            if DIM == 2:
+                threads_per_block = (min(RES, 32), min(RES, 32))
+                blocks_per_grid = (int(np.ceil(RES / threads_per_block[0])), int(np.ceil(RES / threads_per_block[1])))
 
-        inflow_tensor_numba = None
-        inflow_tensor = None
+                density_shape = [1, RES, RES, 1]
 
-        if DIM == 2:
-            density_shape = [1, RES, RES, 1]
-            if RUN_GPU:
                 inflow_tensor = torch.zeros(size=density_shape)
                 inflow_tensor_numba = cuda.as_cuda_array(inflow_tensor.to(device))
-                utils.initialize_data_2d[blocks_per_grid, threads_per_block](inflow_tensor_numba, RES)
-            else:
+                utils.initialize_data2d[blocks_per_grid, threads_per_block](inflow_tensor_numba, RES)
+
+            elif DIM == 3:
+                threads_per_block = (8, 8, 8)
+                blocks_per_grid = (int(RES / threads_per_block[0]), int(RES / threads_per_block[1]), int(RES / threads_per_block[2]))
+
+                density_shape = [1, RES, RES, RES, 1]
+                inflow_tensor = torch.zeros(size=density_shape)
+                inflow_tensor_numba = cuda.as_cuda_array(inflow_tensor.to(device))
+                utils.initialize_data3d[blocks_per_grid, threads_per_block](inflow_tensor_numba, RES)
+
+            VEL_X = VELOCITY.unstack()[0]
+            VEL_Y = VELOCITY.unstack()[1]
+            if DIM == 3:
+                VEL_Z = VELOCITY.unstack()[2]
+
+            # Obtain the domain boxes and move them to the device
+            box_sizes_rho = torch.as_tensor(DENSITY.box.size).to(device)
+            box_lower_rho = torch.as_tensor(DENSITY.box.lower).to(device)
+            box_sizes_vx = torch.as_tensor(VEL_X.box.size).to(device)
+            box_lower_vx = torch.as_tensor(VEL_X.box.lower).to(device)
+            box_lower_vy = torch.as_tensor(VEL_Y.box.lower).to(device)
+            box_sizes_vy = torch.as_tensor(VEL_Y.box.size).to(device)
+            if DIM == 3:
+                box_lower_vz = torch.as_tensor(VEL_Z.box.lower).to(device)
+                box_sizes_vz = torch.as_tensor(VEL_Z.box.size).to(device)
+
+            box_sizes_rho_numba = cuda.as_cuda_array(box_sizes_rho)
+            box_lower_rho_numba = cuda.as_cuda_array(box_lower_rho)
+            box_sizes_vx_numba = cuda.as_cuda_array(box_sizes_vx)
+            box_lower_vx_numba = cuda.as_cuda_array(box_lower_vx)
+            box_sizes_vy_numba = cuda.as_cuda_array(box_sizes_vy)
+            box_lower_vy_numba = cuda.as_cuda_array(box_lower_vy)
+            if DIM == 3:
+                box_sizes_vz_numba = cuda.as_cuda_array(box_sizes_vz)
+                box_lower_vz_numba = cuda.as_cuda_array(box_lower_vz)
+
+            rho_data = torch.as_tensor(DENSITY.data).to(device)
+            vx_data = torch.as_tensor(VEL_X.data).to(device)
+            vy_data = torch.as_tensor(VEL_Y.data).to(device)
+            if DIM == 3:
+                vz_data = torch.as_tensor(VEL_Z.data).to(device)
+
+            rho_points = torch.as_tensor(DENSITY.points.data).to(device)
+            rho_points_x = torch.as_tensor(DENSITY.points.data).to(device)
+            rho_points_y = torch.as_tensor(DENSITY.points.data).to(device)
+            if DIM == 3:
+                rho_points_z = torch.as_tensor(DENSITY.points.data).to(device)
+
+            vx_points = torch.as_tensor(VEL_X.points.data).to(device)
+            vy_points = torch.as_tensor(VEL_Y.points.data).to(device)
+            if DIM == 3:
+                vz_points = torch.as_tensor(VEL_Z.points.data).to(device)
+
+            rho_data_numba = cuda.as_cuda_array(rho_data)
+            vx_data_numba = cuda.as_cuda_array(vx_data)
+            vy_data_numba = cuda.as_cuda_array(vy_data)
+            if DIM == 3:
+                vz_data_numba = cuda.as_cuda_array(vz_data)
+
+            rho_points_numba = cuda.as_cuda_array(rho_points)
+            rho_points_x_numba = cuda.as_cuda_array(rho_points_x)
+            rho_points_y_numba = cuda.as_cuda_array(rho_points_y)
+            if DIM == 3:
+                rho_points_z_numba = cuda.as_cuda_array(rho_points_z)
+
+            vx_points_numba = cuda.as_cuda_array(vx_points)
+            vy_points_numba = cuda.as_cuda_array(vy_points)
+            if DIM == 3:
+                vz_points_numba = cuda.as_cuda_array(vz_points)
+
+            rho_boundary_array = torch.as_tensor(utils.get_boundary_array(density_shape)).to(device)
+            vx_boundary_array = torch.as_tensor(utils.get_boundary_array(vx_data.shape)).to(device)
+            vy_boundary_array = torch.as_tensor(utils.get_boundary_array(vy_data.shape)).to(device)
+            if DIM == 3:
+                vz_boundary_array = torch.as_tensor(utils.get_boundary_array(vz_data.shape)).to(device)
+
+            for i in range(STEPS):
+                if DIM == 2:
+                    rho_points_x_numba = copy(rho_points_numba)
+                    rho_points_y_numba = copy(rho_points_numba)
+
+                    utils.global_to_local2d[blocks_per_grid, threads_per_block](rho_points_x_numba, box_sizes_vx_numba, box_lower_vx_numba, RES)
+                    vx_data = resample_op(vx_data, rho_points_x, vx_boundary_array, vx_data)
+
+                    utils.global_to_local2d[blocks_per_grid, threads_per_block](rho_points_y_numba, box_sizes_vy_numba, box_lower_vy_numba, RES)
+                    vy_data = resample_op(vy_data, rho_points_y, vy_boundary_array, vy_data)
+
+                    utils.semi_lagrangian_update2d[blocks_per_grid, threads_per_block](rho_points_numba, vx_data_numba, vy_data_numba, DT, RES)
+
+                    utils.global_to_local2d[blocks_per_grid, threads_per_block](rho_points_numba, box_sizes_rho_numba, box_lower_rho_numba, RES)
+                    rho_data = resample_op(rho_data, rho_points, rho_boundary_array, rho_data)
+                    utils.patch_inflow2d[blocks_per_grid, threads_per_block](inflow_tensor_numba, rho_data_numba, DT, RES)
+
+                    utils.global_to_local2d[blocks_per_grid, threads_per_block](vx_points_numba, box_sizes_vx_numba, box_lower_vx_numba, RES)
+                    utils.global_to_local2d[blocks_per_grid, threads_per_block](vy_points_numba, box_sizes_vy_numba, box_lower_vy_numba, RES)
+
+                    vx_x_data = resample_op(vx_data, vx_points, vx_boundary_array, vx_data)
+                    vx_y_data = resample_op(vx_data, vy_points, vx_boundary_array, vx_data)
+
+                    vy_x_data = resample_op(vy_data, vx_points, vy_boundary_array, vy_data)
+                    vy_y_data = resample_op(vy_data, vy_points, vy_boundary_array, vy_data)
+
+                    vx_x_data_numba = cuda.as_cuda_array(vx_x_data)
+                    vx_y_data_numba = cuda.as_cuda_array(vx_y_data)
+                    vy_x_data_numba = cuda.as_cuda_array(vy_x_data)
+                    vy_y_data_numba = cuda.as_cuda_array(vy_y_data)
+
+                    utils.semi_lagrangian_update2d[blocks_per_grid, threads_per_block](vx_points_numba, vx_x_data_numba, vy_x_data_numba, DT, RES)
+                    utils.semi_lagrangian_update2d[blocks_per_grid, threads_per_block](vy_points_numba, vx_y_data_numba, vy_y_data_numba, DT, RES)
+
+                    utils.global_to_local2d[blocks_per_grid, threads_per_block](vx_points_numba, box_sizes_vx_numba, box_lower_vx_numba, RES)
+                    utils.global_to_local2d[blocks_per_grid, threads_per_block](vy_points_numba, box_sizes_vy_numba, box_lower_vy_numba, RES)
+
+                    vx_data = resample_op(vx_data, vx_points, vx_boundary_array, vx_data)
+                    vy_data = resample_op(vy_data, vy_points, vy_boundary_array, vy_data)
+
+                    utils.buoyancy2d[blocks_per_grid, threads_per_block](vy_data_numba, rho_data_numba, 9.81, RES)
+                else:
+                    rho_points_x_numba = copy(rho_points_numba)
+                    rho_points_y_numba = copy(rho_points_numba)
+                    rho_points_z_numba = copy(rho_points_numba)
+
+                    utils.global_to_local3d[blocks_per_grid, threads_per_block](rho_points_x_numba, box_sizes_vx_numba, box_lower_vx_numba, RES)
+                    vx_data = resample_op(vx_data, rho_points_x, vx_boundary_array, vx_data)
+
+                    utils.global_to_local3d[blocks_per_grid, threads_per_block](rho_points_y_numba, box_sizes_vy_numba, box_lower_vy_numba, RES)
+                    vy_data = resample_op(vy_data, rho_points_y, vy_boundary_array, vy_data)
+
+                    utils.global_to_local3d[blocks_per_grid, threads_per_block](rho_points_z_numba, box_sizes_vz_numba, box_lower_vz_numba, RES)
+                    vz_data = resample_op(vz_data, rho_points_z, vz_boundary_array, vz_data)
+
+                    utils.semi_lagrangian_update3d[blocks_per_grid, threads_per_block](rho_points_numba, vx_data_numba, vy_data_numba, vz_data_numba, DT, RES)
+
+                    utils.global_to_local3d[blocks_per_grid, threads_per_block](rho_points_numba, box_sizes_rho_numba, box_lower_rho_numba, RES)
+                    rho_data = resample_op(rho_data, rho_points, rho_boundary_array, rho_data)
+                    utils.patch_inflow3d[blocks_per_grid, threads_per_block](inflow_tensor_numba, rho_data_numba, DT, RES)
+
+                    utils.global_to_local3d[blocks_per_grid, threads_per_block](vx_points_numba, box_sizes_vx_numba, box_lower_vx_numba, RES)
+                    utils.global_to_local3d[blocks_per_grid, threads_per_block](vy_points_numba, box_sizes_vy_numba, box_lower_vy_numba, RES)
+                    utils.global_to_local3d[blocks_per_grid, threads_per_block](vz_points_numba, box_sizes_vz_numba, box_lower_vz_numba, RES)
+
+                    vx_x_data = resample_op(vx_data, vx_points, vx_boundary_array, vx_data)
+                    vx_y_data = resample_op(vx_data, vy_points, vx_boundary_array, vx_data)
+                    vx_z_data = resample_op(vx_data, vz_points, vy_boundary_array, vx_data)
+
+                    vy_x_data = resample_op(vy_data, vx_points, vy_boundary_array, vy_data)
+                    vy_y_data = resample_op(vy_data, vy_points, vy_boundary_array, vy_data)
+                    vy_z_data = resample_op(vy_data, vz_points, vy_boundary_array, vy_data)
+
+                    vz_x_data = resample_op(vz_data, vx_points, vy_boundary_array, vz_data)
+                    vz_y_data = resample_op(vz_data, vy_points, vy_boundary_array, vz_data)
+                    vz_z_data = resample_op(vz_data, vz_points, vz_boundary_array, vz_data)
+
+                    vx_x_data_numba = cuda.as_cuda_array(vx_x_data)
+                    vx_y_data_numba = cuda.as_cuda_array(vx_y_data)
+                    vx_z_data_numba = cuda.as_cuda_array(vx_z_data)
+
+                    vy_x_data_numba = cuda.as_cuda_array(vy_x_data)
+                    vy_y_data_numba = cuda.as_cuda_array(vy_y_data)
+                    vy_z_data_numba = cuda.as_cuda_array(vy_z_data)
+
+                    vz_x_data_numba = cuda.as_cuda_array(vz_x_data)
+                    vz_y_data_numba = cuda.as_cuda_array(vz_y_data)
+                    vz_z_data_numba = cuda.as_cuda_array(vz_z_data)
+
+                    utils.semi_lagrangian_update3d[blocks_per_grid, threads_per_block](vx_points_numba, vx_x_data_numba, vy_x_data_numba, vz_x_data_numba, DT, RES)
+                    utils.semi_lagrangian_update3d[blocks_per_grid, threads_per_block](vy_points_numba, vx_y_data_numba, vy_y_data_numba, vz_y_data_numba, DT, RES)
+                    utils.semi_lagrangian_update3d[blocks_per_grid, threads_per_block](vz_points_numba, vx_z_data_numba, vy_z_data_numba, vz_z_data_numba, DT, RES)
+
+                    utils.global_to_local3d[blocks_per_grid, threads_per_block](vx_points_numba, box_sizes_vx_numba, box_lower_vx_numba, RES)
+                    utils.global_to_local3d[blocks_per_grid, threads_per_block](vy_points_numba, box_sizes_vy_numba, box_lower_vy_numba, RES)
+                    utils.global_to_local3d[blocks_per_grid, threads_per_block](vz_points_numba, box_sizes_vz_numba, box_lower_vz_numba, RES)
+
+                    vx_data = resample_op(vx_data, vx_points, vx_boundary_array, vx_data)
+                    vy_data = resample_op(vy_data, vy_points, vy_boundary_array, vy_data)
+                    vz_data = resample_op(vz_data, vz_points, vz_boundary_array, vz_data)
+
+                    utils.buoyancy3d[blocks_per_grid, threads_per_block](vy_data_numba, rho_data_numba, 9.81, RES)
+
+                if IS_PRESSURE:
+                    pressure_solve_start = time.time()
+                    VELOCITY = divergence_free(VELOCITY, FLOW.domain, obstacles=(), pressure_solver=SparseCG(max_iterations=100))
+                    pressure_solve_end = time.time()
+
+                    pressure_time = pressure_solve_end - pressure_solve_start
+
+                if ANIMATE:
+                    array = rho_data.cpu().data.numpy()
+                    if len(array.shape) <= 4:
+                        ima = np.reshape(array[0], [array.shape[1], array.shape[2]])  # remove channel dimension , 2d
+                    else:
+                        ima = array[0, :, array.shape[1] // 2, :, 0]  # 3d , middle z slice
+                        ima = np.reshape(ima, [array.shape[1], array.shape[2]])  # remove channel dimension
+                    fig = plt.figure()
+                    ax = fig.add_subplot(1, 1, 1)
+                    ax.contourf(ima, cmap='inferno')
+                    plt.draw()
+                    plt.pause(0.5)
+                    plt.close()
+
+        else:
+            device = 'cpu'
+            import utils as utils
+
+            if DIM == 2:
+                density_shape = [1, RES, RES, 1]
                 inflow_tensor = torch.zeros(size=density_shape)
                 inflow_tensor = utils.initialize_data_2d(inflow_tensor, RES)
-        else:
-            density_shape = [1, RES, RES, RES, 1]
-            if RUN_GPU:
-                inflow_tensor = torch.zeros(size=density_shape)
-                inflow_tensor_numba = cuda.as_cuda_array(inflow_tensor.to(device))
-                utils.initialize_data_3d[blocks_per_grid, threads_per_block](inflow_tensor_numba, RES)
-            else:
+            elif DIM == 3:
+                density_shape = [1, RES, RES, RES, 1]
                 inflow_tensor = torch.zeros(size=density_shape)
                 inflow_tensor = utils.initialize_data_3d(inflow_tensor, RES)
 
+            for i in range(STEPS):
 
-        for i in range(STEPS):
-            start = time.time()
-            sample_counter = 0.0
-            advection_counter = 0.0
+                x_rho = torch_from_numpy(DENSITY.points.data)
 
-            x_rho = torch_from_numpy(DENSITY.points.data)
-
-            sample_start = time.time()
-            v_rho = VELOCITY.sample_at(x_rho, device=device)
-            sample_end = time.time()
-            sample_counter += sample_end - sample_start
-
-            advection_start = time.time()
-            if RUN_GPU:
-                x_rho_gpu = x_rho.to(device)
-                x_rho_numba = cuda.as_cuda_array(x_rho_gpu)
-                v_rho_gpu = v_rho.to(device)
-                v_rho_numba = cuda.as_cuda_array(v_rho_gpu)
-                if DIM == 2:
-                    utils.semi_lagrangian_update2d[blocks_per_grid, threads_per_block](x_rho_numba, v_rho_numba, DT, RES)
-                else:
-                    utils.semi_lagrangian_update3d[blocks_per_grid, threads_per_block](x_rho_numba, v_rho_numba, DT)
-                x_rho = x_rho_gpu.to("cpu")
-            else:
+                v_rho = VELOCITY.sample_at(x_rho, device=device)
                 x_rho = utils.semi_lagrangian_update(x_rho, v_rho, DT)
-            advection_end = time.time()
-            advection_counter += advection_end - advection_start
-
-            sample_start = time.time()
-            x_rho = DENSITY.sample_at(x_rho, device)
-            sample_end = time.time()
-            sample_counter += sample_end - sample_start
-
-            inflow_patch_start = time.time()
-            if RUN_GPU:
-                x_rho_gpu = x_rho.to(device)
-                x_rho_numba = cuda.as_cuda_array(x_rho_gpu)
-                if DIM == 2:
-                    utils.patch_inflow2d[blocks_per_grid, threads_per_block](inflow_tensor_numba, x_rho_numba, DT, RES)
-                else:
-                    utils.patch_inflow3d[blocks_per_grid, threads_per_block](inflow_tensor_numba, x_rho_numba, DT)
-                x_rho = x_rho_gpu.to("cpu")
-            else:
+                x_rho = DENSITY.sample_at(x_rho, device)
                 x_rho = utils.patch_inflow(inflow_tensor, x_rho, DT)
-            inflow_patch_end = time.time()
-            inflow_patch_time = inflow_patch_end - inflow_patch_start
 
-            x_vel_list = []
+                x_vel_list = []
 
-            for component in VELOCITY.unstack():
-                x_vel = torch_from_numpy(component.points.data)
+                for component in VELOCITY.unstack():
+                    x_vel = torch_from_numpy(component.points.data)
 
-                sample_start = time.time()
-                v_vel = VELOCITY.sample_at(x_vel, device)
-                sample_end = time.time()
-                sample_counter += sample_end - sample_start
-
-                advection_start = time.time()
-                if RUN_GPU:
-                    x_vel_gpu = x_vel.to(device)
-                    x_vel_numba = cuda.as_cuda_array(x_vel_gpu)
-                    v_vel_gpu = v_vel.to(device)
-                    v_vel_numba = cuda.as_cuda_array(v_vel_gpu)
-                    if DIM == 2:
-                        utils.semi_lagrangian_update2d[blocks_per_grid, threads_per_block](x_vel_numba, v_vel_numba, DT, RES)
-                    else:
-                        utils.semi_lagrangian_update3d[blocks_per_grid, threads_per_block](x_vel_numba, v_vel_numba, DT)
-                    x_vel = x_vel_gpu.to("cpu")
-                else:
+                    v_vel = VELOCITY.sample_at(x_vel, device)
                     x_vel = utils.semi_lagrangian_update(x_vel, v_vel, DT)
-                advection_end = time.time()
-                advection_counter += advection_end - advection_start
+                    x_vel = component.sample_at(x_vel, device)
 
-                sample_start = time.time()
-                x_vel = component.sample_at(x_vel, device)
-                sample_end = time.time()
-                sample_counter += sample_end - sample_start
+                    x_vel_list.append(x_vel)
 
-                x_vel_list.append(x_vel)
+                # Update the object data
+                DENSITY = DENSITY.with_data(x_rho)
+                VELOCITY = VELOCITY.with_data(x_vel_list)
 
-            # Update the object data
-            DENSITY = DENSITY.with_data(x_rho)
-            VELOCITY = VELOCITY.with_data(x_vel_list)
+                VELOCITY += buoyancy(DENSITY, 9.81, FLOW.buoyancy_factor)
 
-            VELOCITY += buoyancy(DENSITY, 9.81, FLOW.buoyancy_factor)
-
-            if IS_PRESSURE:
-                pressure_solve_start = time.time()
-                VELOCITY = divergence_free(VELOCITY, FLOW.domain, obstacles=(), pressure_solver=SparseCG(max_iterations=100))
-                pressure_solve_end = time.time()
-
-                pressure_time = pressure_solve_end - pressure_solve_start
-
-            if SAVE_IMAGE:
-                utils.save_img(DENSITY.data, 10000., IMG_PATH + "/torch_%04d.png" % i)
-
-            if ANIMATE:
-                array = DENSITY.data
-                if len(array.shape) <= 4:
-                    ima = np.reshape(array[0], [array.shape[1], array.shape[2]])  # remove channel dimension , 2d
-                else:
-                    ima = array[0, :, array.shape[1] // 2, :, 0]  # 3d , middle z slice
-                ima = np.reshape(ima, [array.shape[1], array.shape[2]])  # remove channel dimension
-
-                fig = plt.figure()
-                ax = fig.add_subplot(1, 1, 1)
-                ax.contourf(ima, cmap='inferno')
-                plt.pause(0.5)
-                plt.close(fig)
-
-            end = time.time()
-
-            total_time = end-start
-
-            if RUN_GPU:
-                advection_percentage_gpu[RES].append(advection_counter)
-                sampling_percentage_gpu[RES].append(sample_counter)
-                inflow_patch_percentage_gpu[RES].append(inflow_patch_time)
-                total_time_gpu[RES].append(total_time)
-            else:
-                advection_percentage_cpu[RES].append(advection_counter)
-                sampling_percentage_cpu[RES].append(sample_counter)
-                inflow_patch_percentage_cpu[RES].append(inflow_patch_time)
-                total_time_cpu[RES].append(total_time)
-
-            print("-------------------------------------------------------------------------------------")
-            print("Step", i, "executed in", total_time, "seconds with GPU", RUN_GPU)
-            if IS_PRESSURE:
-                print("- Pressure Solver: ", pressure_time/total_time * 100, "%")
-            print("- Advection: ", advection_counter / total_time * 100, "%")
-            print("- Sampling: ", sample_counter / total_time * 100, "%")
-            print("- Inflow patch: ", inflow_patch_time / total_time * 100, "%")
-
-advection_percentage_means_gpu = []
-sampling_percentage_means_gpu = []
-inflow_patch_percentage_means_gpu = []
-total_time_means_gpu = []
-
-advection_percentage_means_cpu = []
-sampling_percentage_means_cpu = []
-inflow_patch_percentage_means_cpu = []
-total_time_means_cpu = []
-
-for res in resolutions:
-    advection_percentage_means_gpu.append(np.mean(advection_percentage_gpu[res]))
-    sampling_percentage_means_gpu.append(np.mean(sampling_percentage_gpu[res]))
-    inflow_patch_percentage_means_gpu.append(np.mean(inflow_patch_percentage_gpu[res]))
-    total_time_means_gpu.append(np.mean(total_time_gpu[res]))
-
-    advection_percentage_means_cpu.append(np.mean(advection_percentage_cpu[res]))
-    sampling_percentage_means_cpu.append(np.mean(sampling_percentage_cpu[res]))
-    inflow_patch_percentage_means_cpu.append(np.mean(inflow_patch_percentage_cpu[res]))
-    total_time_means_cpu.append(np.mean(total_time_cpu[res]))
-
-fig, (ax1, ax2) = plt.subplots(2,1)
-
-advection_plot_gpu = ax1.plot(resolutions, advection_percentage_means_gpu, label="Advection Patching - GPU", marker="o", linestyle="-")
-inflow_plot_gpu = ax1.plot(resolutions, inflow_patch_percentage_means_gpu, label="Inflow Patching - GPU", marker="x", linestyle="-")
-sampling_plot_gpu = ax1.plot(resolutions, sampling_percentage_means_gpu, label="Sampling - GPU", marker="x", linestyle="-")
-advection_plot_cpu = ax1.plot(resolutions, advection_percentage_means_cpu, label="Advection Patching - CPU", marker="*", linestyle="-")
-inflow_plot_cpu = ax1.plot(resolutions, inflow_patch_percentage_means_cpu, label="Inflow Patching - CPU", marker="h", linestyle="-")
-sampling_plot_cpu = ax1.plot(resolutions, sampling_percentage_means_cpu, label="Sampling - CPU", marker="h", linestyle="-")
-ax1.grid()
-ax1.set_xticks(resolutions)
-ax1.set_xlabel("Resolution", fontsize=12)
-ax1.set_ylabel("Time (s)", fontsize=12)
-ax1.set_title("Execution Time per Time Step - 2D - PyTorch-Numba", fontsize=12)
-ax1.legend()
-
-total_time_cpu = ax2.plot(resolutions, total_time_means_cpu, label="Total Time - CPU", marker="o", linestyle="-")
-total_time_gpu = ax2.plot(resolutions, total_time_means_gpu, label="Total Time - GPU", marker="x", linestyle="-")
-ax2.grid()
-ax2.set_xticks(resolutions)
-ax2.set_xlabel("Resolution", fontsize=12)
-ax2.set_ylabel("Time (s)", fontsize=12)
-ax2.set_ylim([0.0, 7])
-ax2.set_title("Total Execution Time per Time Step - 2D - PyTorch-Numba", fontsize=12)
-ax2.legend()
-
-plt.show()
+                if ANIMATE:
+                    array = DENSITY.data.numpy()
+                    if len(array.shape) <= 4:
+                        ima = np.reshape(array[0], [array.shape[1], array.shape[2]])  # remove channel dimension , 2d
+                    else:
+                        ima = array[0, :, array.shape[1] // 2, :, 0]  # 3d , middle z slice
+                        ima = np.reshape(ima, [array.shape[1], array.shape[2]])  # remove channel dimension
+                    fig = plt.figure()
+                    ax = fig.add_subplot(1, 1, 1)
+                    ax.contourf(ima, cmap='inferno')
+                    plt.draw()
+                    plt.pause(0.5)
+                    plt.close()

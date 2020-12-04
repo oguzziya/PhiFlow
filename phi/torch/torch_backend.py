@@ -114,7 +114,6 @@ class TorchBackend(Backend):
                         boundary_array[i, j] = SYMMETRIC
                     elif current_boundary == 'reflect':
                         boundary_array[i, j] = REFLECT
-
             boundary_array = torch.as_tensor(boundary_array)
             import resample_torch_cuda
             return resample_torch_cuda.resample_op(inputs.to(device), sample_coords.to(device), boundary_array.to(device))
