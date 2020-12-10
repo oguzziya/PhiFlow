@@ -7,9 +7,9 @@ from copy import copy
 IS_PRESSURE = False
 device = "cpu"
 SAVE_IMAGE = False
-ANIMATE = True
+ANIMATE = False
 
-DIM = 3
+DIM = 2
 BATCH_SIZE = 1
 STEPS = 10
 DT = 0.6
@@ -21,14 +21,28 @@ if SAVE_IMAGE:
     if not os.path.exists(IMG_PATH):
         os.makedirs(IMG_PATH)
 
-resolutions = [32,]
-for RUN_GPU in [True]:
+sample_timings = {"GPU": {}, "CPU": {}}
+inflow_timings = {"GPU": {}, "CPU": {}}
+advect_timings = {"GPU": {}, "CPU": {}}
+
+resolutions = [32, 64, 128, 512, 1024, 2048]
+for RUN_GPU in [True, False]:
     for RES in resolutions:
         FLOW = Fluid(Domain([RES] * DIM, boundaries=OPEN), batch_size=BATCH_SIZE, buoyancy_factor=0.2)
         FLOW_TORCH = torch_from_numpy(FLOW)
 
         DENSITY = FLOW_TORCH.density
         VELOCITY = FLOW_TORCH.velocity
+
+        if RUN_GPU:
+            sample_timings["GPU"][RES] = []
+            advect_timings["GPU"][RES] = []
+            inflow_timings["GPU"][RES] = []
+        else:
+            sample_timings["CPU"][RES] = []
+            advect_timings["CPU"][RES] = []
+            inflow_timings["CPU"][RES] = []
+
 
         if RUN_GPU:
             device = 'cuda:0'
@@ -122,22 +136,37 @@ for RUN_GPU in [True]:
                 vz_boundary_array = torch.as_tensor(utils.get_boundary_array(vz_data.shape)).to(device)
 
             for i in range(STEPS):
+
+                sample_time = 0.0
+                advect_time = 0.0
+                inflow_time = 0.0
+
                 if DIM == 2:
                     rho_points_x_numba = copy(rho_points_numba)
                     rho_points_y_numba = copy(rho_points_numba)
 
+                    sample_start = time.time()
                     utils.global_to_local2d[blocks_per_grid, threads_per_block](rho_points_x_numba, box_sizes_vx_numba, box_lower_vx_numba, RES)
                     vx_data = resample_op(vx_data, rho_points_x, vx_boundary_array, vx_data)
 
                     utils.global_to_local2d[blocks_per_grid, threads_per_block](rho_points_y_numba, box_sizes_vy_numba, box_lower_vy_numba, RES)
                     vy_data = resample_op(vy_data, rho_points_y, vy_boundary_array, vy_data)
+                    sample_time += time.time() - sample_start
 
+                    advect_start = time.time()
                     utils.semi_lagrangian_update2d[blocks_per_grid, threads_per_block](rho_points_numba, vx_data_numba, vy_data_numba, DT, RES)
+                    advect_time += time.time() - advect_start
 
+                    sample_start = time.time()
                     utils.global_to_local2d[blocks_per_grid, threads_per_block](rho_points_numba, box_sizes_rho_numba, box_lower_rho_numba, RES)
                     rho_data = resample_op(rho_data, rho_points, rho_boundary_array, rho_data)
-                    utils.patch_inflow2d[blocks_per_grid, threads_per_block](inflow_tensor_numba, rho_data_numba, DT, RES)
+                    sample_time += time.time() - sample_start
 
+                    inflow_start = time.time()
+                    utils.patch_inflow2d[blocks_per_grid, threads_per_block](inflow_tensor_numba, rho_data_numba, DT, RES)
+                    inflow_time += time.time() - inflow_start
+
+                    sample_start = time.time()
                     utils.global_to_local2d[blocks_per_grid, threads_per_block](vx_points_numba, box_sizes_vx_numba, box_lower_vx_numba, RES)
                     utils.global_to_local2d[blocks_per_grid, threads_per_block](vy_points_numba, box_sizes_vy_numba, box_lower_vy_numba, RES)
 
@@ -151,17 +180,27 @@ for RUN_GPU in [True]:
                     vx_y_data_numba = cuda.as_cuda_array(vx_y_data)
                     vy_x_data_numba = cuda.as_cuda_array(vy_x_data)
                     vy_y_data_numba = cuda.as_cuda_array(vy_y_data)
+                    sample_time += time.time() - sample_start
 
+                    advect_start = time.time()
                     utils.semi_lagrangian_update2d[blocks_per_grid, threads_per_block](vx_points_numba, vx_x_data_numba, vy_x_data_numba, DT, RES)
                     utils.semi_lagrangian_update2d[blocks_per_grid, threads_per_block](vy_points_numba, vx_y_data_numba, vy_y_data_numba, DT, RES)
+                    advect_time += time.time() - advect_start
 
+                    sample_start = time.time()
                     utils.global_to_local2d[blocks_per_grid, threads_per_block](vx_points_numba, box_sizes_vx_numba, box_lower_vx_numba, RES)
                     utils.global_to_local2d[blocks_per_grid, threads_per_block](vy_points_numba, box_sizes_vy_numba, box_lower_vy_numba, RES)
 
                     vx_data = resample_op(vx_data, vx_points, vx_boundary_array, vx_data)
                     vy_data = resample_op(vy_data, vy_points, vy_boundary_array, vy_data)
+                    advect_time = time.time() - advect_start
 
                     utils.buoyancy2d[blocks_per_grid, threads_per_block](vy_data_numba, rho_data_numba, 9.81, RES)
+
+                    sample_timings["GPU"][RES].append(sample_time)
+                    inflow_timings["GPU"][RES].append(inflow_time)
+                    advect_timings["GPU"][RES].append(advect_time)
+
                 else:
                     rho_points_x_numba = copy(rho_points_numba)
                     rho_points_y_numba = copy(rho_points_numba)
@@ -249,6 +288,10 @@ for RUN_GPU in [True]:
             device = 'cpu'
             import utils as utils
 
+            sample_time = 0.0
+            advect_time = 0.0
+            inflow_time = 0.0
+
             if DIM == 2:
                 density_shape = [1, RES, RES, 1]
                 inflow_tensor = torch.zeros(size=density_shape)
@@ -260,21 +303,38 @@ for RUN_GPU in [True]:
 
             for i in range(STEPS):
 
+                sample_start = time.time()
                 x_rho = torch_from_numpy(DENSITY.points.data)
-
                 v_rho = VELOCITY.sample_at(x_rho, device=device)
+                sample_time += time.time() - sample_start
+
+                advect_start = time.time()
                 x_rho = utils.semi_lagrangian_update(x_rho, v_rho, DT)
+                advect_time += time.time() - advect_start
+
+                sample_start = time.time()
                 x_rho = DENSITY.sample_at(x_rho, device)
+                sample_time += time.time() - sample_start
+
+                inflow_start = 0.0
                 x_rho = utils.patch_inflow(inflow_tensor, x_rho, DT)
+                inflow_time += time.time() - inflow_start
 
                 x_vel_list = []
 
                 for component in VELOCITY.unstack():
+                    sample_start = time.time()
                     x_vel = torch_from_numpy(component.points.data)
-
                     v_vel = VELOCITY.sample_at(x_vel, device)
+                    sample_time += time.time() - sample_start
+
+                    advect_start = time.time()
                     x_vel = utils.semi_lagrangian_update(x_vel, v_vel, DT)
+                    advect_time += time.time() - advect_start
+
+                    sample_start = time.time()
                     x_vel = component.sample_at(x_vel, device)
+                    sample_time += time.time() - sample_start
 
                     x_vel_list.append(x_vel)
 
@@ -283,6 +343,10 @@ for RUN_GPU in [True]:
                 VELOCITY = VELOCITY.with_data(x_vel_list)
 
                 VELOCITY += buoyancy(DENSITY, 9.81, FLOW.buoyancy_factor)
+
+                sample_timings["CPU"][RES].append(sample_time)
+                inflow_timings["CPU"][RES].append(inflow_time)
+                advect_timings["CPU"][RES].append(advect_time)
 
                 if ANIMATE:
                     array = DENSITY.data.numpy()
@@ -297,3 +361,70 @@ for RUN_GPU in [True]:
                     plt.draw()
                     plt.pause(0.5)
                     plt.close()
+
+sample_gpu_means = []
+advect_gpu_means = []
+inflow_gpu_means = []
+
+sample_cpu_means = []
+advect_cpu_means = []
+inflow_cpu_means = []
+
+for res, timings in sample_timings["GPU"].items():
+    sample_gpu_means.append(np.mean(np.asarray(timings)))
+
+for res, timings in advect_timings["GPU"].items():
+    advect_gpu_means.append(np.mean(np.asarray(timings)))
+
+for res, timings in sample_timings["GPU"].items():
+    inflow_gpu_means.append(np.mean(np.asarray(timings)))
+
+for res, timings in sample_timings["CPU"].items():
+    sample_cpu_means.append(np.mean(np.asarray(timings)))
+
+for res, timings in advect_timings["CPU"].items():
+    advect_cpu_means.append(np.mean(np.asarray(timings)))
+
+for res, timings in sample_timings["CPU"].items():
+    inflow_cpu_means.append(np.mean(np.asarray(timings)))
+
+
+plt.rcParams.update({
+    'font.family': 'serif',
+    'font.size': 12,
+    'text.usetex': True
+})
+
+fig_sample = plt.figure(figsize=(4,3))
+fig_advect = plt.figure(figsize=(4,3))
+fig_inflow = plt.figure(figsize=(4,3))
+
+ax_sample = fig_sample.add_subplot(1,1,1)
+ax_advect = fig_advect.add_subplot(1,1,1)
+ax_inflow = fig_inflow.add_subplot(1,1,1)
+
+ax_sample.plot(resolutions, sample_gpu_means, linestyle="-", color="black", marker="o")
+ax_sample.plot(resolutions, sample_cpu_means, linestyle=":", color="black", marker="o")
+ax_sample.legend(["GPU", "CPU"])
+ax_sample.set_xlabel("Resolution")
+ax_sample.set_ylabel("Time (s)")
+ax_sample.set_xticks(resolutions)
+ax_sample.set_title("Resampling")
+
+ax_advect.plot(resolutions, advect_gpu_means, linestyle="-", color="black", marker="o")
+ax_advect.plot(resolutions, advect_cpu_means, linestyle=":", color="black", marker="o")
+ax_advect.legend(["GPU", "CPU"])
+ax_advect.set_xlabel("Resolution")
+ax_advect.set_ylabel("Time (s)")
+ax_advect.set_xticks(resolutions)
+ax_advect.set_title("Advection")
+
+ax_inflow.plot(resolutions, inflow_gpu_means, linestyle="-", color="black", marker="o")
+ax_inflow.plot(resolutions, inflow_cpu_means, linestyle=":", color="black", marker="o")
+ax_inflow.legend(["GPU", "CPU"])
+ax_inflow.set_xlabel("Resolution")
+ax_inflow.set_ylabel("Time (s)")
+ax_inflow.set_xticks(resolutions)
+ax_inflow.set_title("Inflow Patching")
+
+plt.show()
