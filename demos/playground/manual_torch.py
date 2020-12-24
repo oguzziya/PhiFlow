@@ -7,7 +7,7 @@ from copy import copy
 IS_PRESSURE = False
 device = "cpu"
 SAVE_IMAGE = False
-ANIMATE = False
+ANIMATE = True
 
 DIM = 2
 BATCH_SIZE = 1
@@ -25,8 +25,8 @@ sample_timings = {"GPU": {}, "CPU": {}}
 inflow_timings = {"GPU": {}, "CPU": {}}
 advect_timings = {"GPU": {}, "CPU": {}}
 
-resolutions = [32, 64, 128, 512, 1024, 2048]
-for RUN_GPU in [True, False]:
+resolutions = [128, ]
+for RUN_GPU in [True, ]:
     for RES in resolutions:
         FLOW = Fluid(Domain([RES] * DIM, boundaries=OPEN), batch_size=BATCH_SIZE, buoyancy_factor=0.2)
         FLOW_TORCH = torch_from_numpy(FLOW)
@@ -101,11 +101,23 @@ for RUN_GPU in [True, False]:
             if DIM == 3:
                 vz_data = torch.as_tensor(VEL_Z.data).to(device)
 
+            rho_data_resample = torch.as_tensor(DENSITY.data).to(device)
+            vx_data_resample = torch.as_tensor(VEL_X.data).to(device)
+            vy_data_resample = torch.as_tensor(VEL_Y.data).to(device)
+            if(DIM == 3):
+                vx_data_resample = torch.as_tensor(VEL_Z.data).to(device)
+
             rho_points = torch.as_tensor(DENSITY.points.data).to(device)
             rho_points_x = torch.as_tensor(DENSITY.points.data).to(device)
             rho_points_y = torch.as_tensor(DENSITY.points.data).to(device)
             if DIM == 3:
                 rho_points_z = torch.as_tensor(DENSITY.points.data).to(device)
+
+            vx_points_x = torch.as_tensor(VEL_X.points.data).to(device)
+            vx_points_y = torch.as_tensor(VEL_X.points.data).to(device)
+
+            vy_points_x = torch.as_tensor(VEL_Y.points.data).to(device)
+            vy_points_y = torch.as_tensor(VEL_Y.points.data).to(device)
 
             vx_points = torch.as_tensor(VEL_X.points.data).to(device)
             vy_points = torch.as_tensor(VEL_Y.points.data).to(device)
@@ -123,6 +135,12 @@ for RUN_GPU in [True, False]:
             rho_points_y_numba = cuda.as_cuda_array(rho_points_y)
             if DIM == 3:
                 rho_points_z_numba = cuda.as_cuda_array(rho_points_z)
+
+            vx_points_x_numba = cuda.as_cuda_array(vx_points_x)
+            vx_points_y_numba = cuda.as_cuda_array(vx_points_y)
+
+            vy_points_x_numba = cuda.as_cuda_array(vy_points_x)
+            vy_points_y_numba = cuda.as_cuda_array(vy_points_y)
 
             vx_points_numba = cuda.as_cuda_array(vx_points)
             vy_points_numba = cuda.as_cuda_array(vy_points)
@@ -142,24 +160,20 @@ for RUN_GPU in [True, False]:
                 inflow_time = 0.0
 
                 if DIM == 2:
-                    rho_points_x_numba = copy(rho_points_numba)
-                    rho_points_y_numba = copy(rho_points_numba)
-
                     sample_start = time.time()
-                    utils.global_to_local2d[blocks_per_grid, threads_per_block](rho_points_x_numba, box_sizes_vx_numba, box_lower_vx_numba, RES)
-                    vx_data = resample_op(vx_data, rho_points_x, vx_boundary_array, vx_data)
-
-                    utils.global_to_local2d[blocks_per_grid, threads_per_block](rho_points_y_numba, box_sizes_vy_numba, box_lower_vy_numba, RES)
-                    vy_data = resample_op(vy_data, rho_points_y, vy_boundary_array, vy_data)
+                    vx_data_resample = utils.resample(vx_data, rho_points, vx_boundary_array, box_sizes_vx, box_lower_vx, blocks_per_grid, threads_per_block, RES, vx_data_resample)
+                    vy_data_resample = utils.resample(vy_data, rho_points, vy_boundary_array, box_sizes_vy, box_lower_vy, blocks_per_grid, threads_per_block, RES, vy_data_resample)
+                    vx_data_resample_numba = cuda.as_cuda_array(vx_data_resample)
+                    vy_data_resample_numba = cuda.as_cuda_array(vy_data_resample)
                     sample_time += time.time() - sample_start
 
                     advect_start = time.time()
-                    utils.semi_lagrangian_update2d[blocks_per_grid, threads_per_block](rho_points_numba, vx_data_numba, vy_data_numba, DT, RES)
+                    utils.semi_lagrangian_update2d[blocks_per_grid, threads_per_block](rho_points_numba, vx_data_resample_numba, vy_data_resample_numba, DT, RES)
                     advect_time += time.time() - advect_start
 
                     sample_start = time.time()
-                    utils.global_to_local2d[blocks_per_grid, threads_per_block](rho_points_numba, box_sizes_rho_numba, box_lower_rho_numba, RES)
-                    rho_data = resample_op(rho_data, rho_points, rho_boundary_array, rho_data)
+                    rho_data = utils.resample(rho_data, rho_points, rho_boundary_array, box_sizes_rho, box_lower_rho, blocks_per_grid, threads_per_block, RES, rho_data_resample)
+                    rho_data_numba = cuda.as_cuda_array(rho_data)
                     sample_time += time.time() - sample_start
 
                     inflow_start = time.time()
@@ -167,33 +181,23 @@ for RUN_GPU in [True, False]:
                     inflow_time += time.time() - inflow_start
 
                     sample_start = time.time()
-                    utils.global_to_local2d[blocks_per_grid, threads_per_block](vx_points_numba, box_sizes_vx_numba, box_lower_vx_numba, RES)
-                    utils.global_to_local2d[blocks_per_grid, threads_per_block](vy_points_numba, box_sizes_vy_numba, box_lower_vy_numba, RES)
-
-                    vx_x_data = resample_op(vx_data, vx_points, vx_boundary_array, vx_data)
-                    vx_y_data = resample_op(vx_data, vy_points, vx_boundary_array, vx_data)
-
-                    vy_x_data = resample_op(vy_data, vx_points, vy_boundary_array, vy_data)
-                    vy_y_data = resample_op(vy_data, vy_points, vy_boundary_array, vy_data)
-
-                    vx_x_data_numba = cuda.as_cuda_array(vx_x_data)
+                    vx_y_data = utils.resample(vx_data, vy_points, vx_boundary_array, box_sizes_vx, box_lower_vx, blocks_per_grid, threads_per_block, RES, vx_data_resample)
+                    vy_x_data = utils.resample(vy_data, vx_points, vy_boundary_array, box_sizes_vy, box_lower_vy, blocks_per_grid, threads_per_block, RES, vy_data_resample)
                     vx_y_data_numba = cuda.as_cuda_array(vx_y_data)
                     vy_x_data_numba = cuda.as_cuda_array(vy_x_data)
-                    vy_y_data_numba = cuda.as_cuda_array(vy_y_data)
                     sample_time += time.time() - sample_start
 
                     advect_start = time.time()
-                    utils.semi_lagrangian_update2d[blocks_per_grid, threads_per_block](vx_points_numba, vx_x_data_numba, vy_x_data_numba, DT, RES)
-                    utils.semi_lagrangian_update2d[blocks_per_grid, threads_per_block](vy_points_numba, vx_y_data_numba, vy_y_data_numba, DT, RES)
+                    utils.semi_lagrangian_update2d[blocks_per_grid, threads_per_block](vx_points_numba, vx_data_numba, vy_x_data_numba, DT, RES)
+                    utils.semi_lagrangian_update2d[blocks_per_grid, threads_per_block](vy_points_numba, vx_y_data_numba, vy_data_numba, DT, RES)
                     advect_time += time.time() - advect_start
 
                     sample_start = time.time()
-                    utils.global_to_local2d[blocks_per_grid, threads_per_block](vx_points_numba, box_sizes_vx_numba, box_lower_vx_numba, RES)
-                    utils.global_to_local2d[blocks_per_grid, threads_per_block](vy_points_numba, box_sizes_vy_numba, box_lower_vy_numba, RES)
-
-                    vx_data = resample_op(vx_data, vx_points, vx_boundary_array, vx_data)
-                    vy_data = resample_op(vy_data, vy_points, vy_boundary_array, vy_data)
-                    advect_time = time.time() - advect_start
+                    vx_data = utils.resample(vx_data, vx_points, vx_boundary_array, box_sizes_vx, box_lower_vx, blocks_per_grid, threads_per_block, RES, vx_data_resample)
+                    vy_data = utils.resample(vy_data, vy_points, vy_boundary_array, box_sizes_vy, box_lower_vy, blocks_per_grid, threads_per_block, RES, vy_data_resample)
+                    vx_data_numba = cuda.as_cuda_array(vx_data)
+                    vy_data_numba = cuda.as_cuda_array(vy_data)
+                    sample_time = time.time() - sample_start
 
                     utils.buoyancy2d[blocks_per_grid, threads_per_block](vy_data_numba, rho_data_numba, 9.81, RES)
 

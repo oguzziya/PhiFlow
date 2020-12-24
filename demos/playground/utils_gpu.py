@@ -50,21 +50,20 @@ def patch_inflow3d(inflow_tensor, data, dt, res):
     if i < res and j < res and k < res:
         data[0, i, j, k, 0] += inflow_tensor[0, i, j, k, 0] * dt
 
-
 @cuda.jit
 def global_to_local2d(points, size, lower, res):
     i,j = cuda.grid(2)
     if i < res and j < res:
-        points[0, i, j, 0] = (points[0, i, j, 0] - lower[0])/(size[0]) * res - 0.5
-        points[0, i, j, 1] = (points[0, i, j, 1] - lower[1])/(size[1]) * res - 0.5
+        points[0, i, j, 0] = (points[0, i, j, 0] - lower[0])/(size[0]) * float(res) - 0.5
+        points[0, i, j, 1] = (points[0, i, j, 1] - lower[1])/(size[1]) * float(res) - 0.5
 
 @cuda.jit
 def global_to_local3d(points, size, lower, res):
     i,j,k = cuda.grid(3)
     if i < res and j < res and k < res:
-        points[0, i, j, k, 0] = (points[0, i, j, k, 0] - lower[0])/(size[0]) * res - 0.5
-        points[0, i, j, k, 1] = (points[0, i, j, k, 1] - lower[1])/(size[1]) * res - 0.5
-        points[0, i, j, k, 2] = (points[0, i, j, k, 2] - lower[2])/(size[2]) * res - 0.5
+        points[0, i, j, k, 0] = (points[0, i, j, k, 0] - lower[0])/(size[0]) * float(res) - 0.5
+        points[0, i, j, k, 1] = (points[0, i, j, k, 1] - lower[1])/(size[1]) * float(res) - 0.5
+        points[0, i, j, k, 2] = (points[0, i, j, k, 2] - lower[2])/(size[2]) * float(res) - 0.5
 
 @cuda.jit
 def buoyancy2d(vel, rho, factor, res):
@@ -78,7 +77,8 @@ def buoyancy3d(vel, rho, factor, res):
     if i < res and j < res and k < res:
         vel[0, i, j, k, 0] -= (rho[0, i, j, k, 0] * factor)
 
-def resample(inputs, sample_coords, boundary_array, output):
+def resample(inputs, sample_coords, boundary_array, box_sizes, box_lower, blocks, threads, res, output):
+    global_to_local2d[blocks, threads](sample_coords, box_sizes, box_lower, res)
     return resample_torch_cuda.resample_op(inputs, sample_coords, boundary_array, output)
 
 def get_boundary_array(shape):
