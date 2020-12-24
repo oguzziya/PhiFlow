@@ -77,8 +77,12 @@ def buoyancy3d(vel, rho, factor, res):
     if i < res and j < res and k < res:
         vel[0, i, j, k, 0] -= (rho[0, i, j, k, 0] * factor)
 
-def resample(inputs, sample_coords, boundary_array, box_sizes, box_lower, blocks, threads, res, output):
+def resample2d(inputs, sample_coords, boundary_array, box_sizes, box_lower, blocks, threads, res, output):
     global_to_local2d[blocks, threads](sample_coords, box_sizes, box_lower, res)
+    return resample_torch_cuda.resample_op(inputs, sample_coords, boundary_array, output)
+
+def resample3d(inputs, sample_coords, boundary_array, box_sizes, box_lower, blocks, threads, res, output):
+    global_to_local3d[blocks, threads](sample_coords, box_sizes, box_lower, res)
     return resample_torch_cuda.resample_op(inputs, sample_coords, boundary_array, output)
 
 def get_boundary_array(shape):
