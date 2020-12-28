@@ -3,6 +3,7 @@ from numba import cuda
 import resample_torch_cuda
 from phi.backend.tensorop import collapsed_gather_nd
 import torch
+from copy import copy
 
 @cuda.jit
 def initialize_data2d(data, res):
@@ -27,8 +28,8 @@ def semi_lagrangian_update(x, v, dt):
 def semi_lagrangian_update2d(x, vx, vy, dt, res):
     i, j = cuda.grid(2)
     if i < res and j < res:
-        x[0, i, j, 0] -= vx[0, i, j, 0] * dt
-        x[0, i, j, 1] -= vy[0, i, j, 0] * dt
+        x[0, i, j, 0] = x[0, i, j, 0] - vx[0, i, j, 0] * dt
+        x[0, i, j, 1] = x[0, i, j, 1] - vy[0, i, j, 0] * dt
 
 @cuda.jit
 def semi_lagrangian_update3d(x, vx, vy, vz, dt, res):
@@ -66,10 +67,10 @@ def global_to_local3d(points, size, lower, res):
         points[0, i, j, k, 2] = (points[0, i, j, k, 2] - lower[2])/(size[2]) * float(res) - 0.5
 
 @cuda.jit
-def buoyancy2d(vel, rho, factor, res):
+def buoyancy2d(vel, rho, gravity, buoyancy_factor, res):
     i, j = cuda.grid(2)
     if i < res and j < res:
-        vel[0, i, j, 0] -= (rho[0, i, j, 0] * factor)
+        vel[0, i, j, 0] = vel[0, i, j, 0] + (rho[0, i, j, 0] * gravity * buoyancy_factor)
 
 @cuda.jit
 def buoyancy3d(vel, rho, factor, res):
@@ -79,11 +80,11 @@ def buoyancy3d(vel, rho, factor, res):
 
 def resample2d(inputs, sample_coords, boundary_array, box_sizes, box_lower, blocks, threads, res, output):
     global_to_local2d[blocks, threads](sample_coords, box_sizes, box_lower, res)
-    return resample_torch_cuda.resample_op(inputs, sample_coords, boundary_array, output)
+    return copy(resample_torch_cuda.resample_op(inputs, sample_coords, boundary_array, output))
 
 def resample3d(inputs, sample_coords, boundary_array, box_sizes, box_lower, blocks, threads, res, output):
     global_to_local3d[blocks, threads](sample_coords, box_sizes, box_lower, res)
-    return resample_torch_cuda.resample_op(inputs, sample_coords, boundary_array, output)
+    return copy(resample_torch_cuda.resample_op(inputs, sample_coords, boundary_array, output))
 
 def get_boundary_array(shape):
     ZERO = 0
@@ -95,7 +96,7 @@ def get_boundary_array(shape):
     boundary_array = np.zeros((dims, 2), np.int32)
     for i in range(dims):
         for j in range(2):
-            current_boundary = collapsed_gather_nd('constant', [i, j]).lower()
+            current_boundary = collapsed_gather_nd('zero', [i, j]).lower()
             if current_boundary == 'zero' or current_boundary == 'constant':
                 boundary_array[i, j] = ZERO
             elif current_boundary == 'replicate':
@@ -112,11 +113,11 @@ from PIL import Image
 
 def save_img(array, scale, name, idx=0):
     if len(array.shape) <= 4:
-        ima = np.reshape(array[idx], [array.shape[1], array.shape[2]])  # remove channel dimension , 2d
+        ima = np.reshape(array[0], [array.shape[1], array.shape[2]])  # remove channel dimension , 2d
     else:
-        ima = array[idx, :, array.shape[1] // 2, :, 0]  # 3d , middle z slice
+        ima = array[0, :, array.shape[1] // 2, :, 0]  # 3d , middle z slice
+        ima = np.reshape(ima, [array.shape[1], array.shape[2]])  # remove channel dimension
     ima = np.reshape(ima, [array.shape[1], array.shape[2]])  # remove channel dimension
-    # ima = ima[::-1, :]  # flip along y
     image = Image.fromarray(np.asarray(ima * scale, dtype='i'))
     print("    Writing image '" + name + "'")
     image.save(name)

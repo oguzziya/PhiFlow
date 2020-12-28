@@ -57,6 +57,8 @@ torch::Tensor resample_op(torch::Tensor data, torch::Tensor points, const torch:
     // outputElementsPerBatch
     const unsigned int outputElementsPerBatch = output.numel() / outputBatchSize;
 
+    torch::Tensor outputTensor = torch::zeros_like(data);
+
     LaunchResampleKernel(
             dataBatchSize,
             dims,
@@ -67,11 +69,11 @@ torch::Tensor resample_op(torch::Tensor data, torch::Tensor points, const torch:
             output.numel(),
             data.data_ptr<float>(),
             points.data_ptr<float>(),
-            output.data_ptr<float>(),
+            outputTensor.data_ptr<float>(),
             (Boundary*) boundaries.data_ptr<int>()
             );
 
-    return output;
+    return outputTensor;
 }
 }
 

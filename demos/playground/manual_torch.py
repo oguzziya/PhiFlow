@@ -4,10 +4,11 @@ import torch
 import time
 from resample_torch_cuda import resample_op
 from copy import copy
+
 IS_PRESSURE = False
 device = "cpu"
 SAVE_IMAGE = False
-ANIMATE = True
+ANIMATE = False
 
 DIM = 2
 BATCH_SIZE = 1
@@ -16,8 +17,10 @@ DT = 0.6
 
 DT = np.float32(DT)
 
+IMG_PATH = os.path.expanduser("~/Repos/Simulations/phi/data/manual/torch")
+
 if SAVE_IMAGE:
-    IMG_PATH = os.path.expanduser("~/Simulations/phi/data/manual/torch")
+    IMG_PATH = os.path.expanduser("~/Repos/Simulations/phi/data/manual/torch")
     if not os.path.exists(IMG_PATH):
         os.makedirs(IMG_PATH)
 
@@ -25,8 +28,8 @@ sample_timings = {"GPU": {}, "CPU": {}}
 inflow_timings = {"GPU": {}, "CPU": {}}
 advect_timings = {"GPU": {}, "CPU": {}}
 
-resolutions = [128, ]
-for RUN_GPU in [True, ]:
+resolutions = [32, 64, 128, 256, 512, 1024, 2048]
+for RUN_GPU in [True, False]:
     for RES in resolutions:
         FLOW = Fluid(Domain([RES] * DIM, boundaries=OPEN), batch_size=BATCH_SIZE, buoyancy_factor=0.2)
         FLOW_TORCH = torch_from_numpy(FLOW)
@@ -79,8 +82,8 @@ for RUN_GPU in [True, ]:
             box_lower_rho = torch.as_tensor(DENSITY.box.lower).to(device)
             box_sizes_vx = torch.as_tensor(VEL_X.box.size).to(device)
             box_lower_vx = torch.as_tensor(VEL_X.box.lower).to(device)
-            box_lower_vy = torch.as_tensor(VEL_Y.box.lower).to(device)
             box_sizes_vy = torch.as_tensor(VEL_Y.box.size).to(device)
+            box_lower_vy = torch.as_tensor(VEL_Y.box.lower).to(device)
             if DIM == 3:
                 box_lower_vz = torch.as_tensor(VEL_Z.box.lower).to(device)
                 box_sizes_vz = torch.as_tensor(VEL_Z.box.size).to(device)
@@ -102,22 +105,22 @@ for RUN_GPU in [True, ]:
                 vz_data = torch.as_tensor(VEL_Z.data).to(device)
 
             rho_data_resample = torch.as_tensor(DENSITY.data).to(device)
-            vx_data_resample = torch.as_tensor(VEL_X.data).to(device)
-            vy_data_resample = torch.as_tensor(VEL_Y.data).to(device)
+            vx_data_resample = copy(torch.as_tensor(VEL_X.data).to(device))
+            vy_data_resample = copy(torch.as_tensor(VEL_Y.data).to(device))
             if(DIM == 3):
                 vx_data_resample = torch.as_tensor(VEL_Z.data).to(device)
 
             rho_points = torch.as_tensor(DENSITY.points.data).to(device)
-            rho_points_x = torch.as_tensor(DENSITY.points.data).to(device)
-            rho_points_y = torch.as_tensor(DENSITY.points.data).to(device)
+            rho_points_x = copy(torch.as_tensor(DENSITY.points.data).to(device))
+            rho_points_y = copy(torch.as_tensor(DENSITY.points.data).to(device))
             if DIM == 3:
                 rho_points_z = torch.as_tensor(DENSITY.points.data).to(device)
 
-            vx_points_x = torch.as_tensor(VEL_X.points.data).to(device)
-            vx_points_y = torch.as_tensor(VEL_X.points.data).to(device)
+            vx_points_x = copy(torch.as_tensor(VEL_X.points.data).to(device))
+            vx_points_y = copy(torch.as_tensor(VEL_X.points.data).to(device))
 
-            vy_points_x = torch.as_tensor(VEL_Y.points.data).to(device)
-            vy_points_y = torch.as_tensor(VEL_Y.points.data).to(device)
+            vy_points_x = copy(torch.as_tensor(VEL_Y.points.data).to(device))
+            vy_points_y = copy(torch.as_tensor(VEL_Y.points.data).to(device))
 
             vx_points = torch.as_tensor(VEL_X.points.data).to(device)
             vy_points = torch.as_tensor(VEL_Y.points.data).to(device)
@@ -161,14 +164,14 @@ for RUN_GPU in [True, ]:
 
                 if DIM == 2:
                     sample_start = time.time()
-                    vx_data_resample = utils.resample2d(vx_data, rho_points, vx_boundary_array, box_sizes_vx, box_lower_vx, blocks_per_grid, threads_per_block, RES, vx_data_resample)
-                    vy_data_resample = utils.resample2d(vy_data, rho_points, vy_boundary_array, box_sizes_vy, box_lower_vy, blocks_per_grid, threads_per_block, RES, vy_data_resample)
-                    vx_data_resample_numba = cuda.as_cuda_array(vx_data_resample)
-                    vy_data_resample_numba = cuda.as_cuda_array(vy_data_resample)
+                    vx_data = utils.resample2d(vx_data, rho_points, vx_boundary_array, box_sizes_vx, box_lower_vx, blocks_per_grid, threads_per_block, RES, vx_data_resample)
+                    vy_data = utils.resample2d(vy_data, rho_points, vy_boundary_array, box_sizes_vy, box_lower_vy, blocks_per_grid, threads_per_block, RES, vy_data_resample)
+                    vx_data_numba = cuda.as_cuda_array(vx_data)
+                    vy_data_numba = cuda.as_cuda_array(vy_data)
                     sample_time += time.time() - sample_start
 
                     advect_start = time.time()
-                    utils.semi_lagrangian_update2d[blocks_per_grid, threads_per_block](rho_points_numba, vx_data_resample_numba, vy_data_resample_numba, DT, RES)
+                    utils.semi_lagrangian_update2d[blocks_per_grid, threads_per_block](rho_points_numba, vx_data_numba, vy_data_numba, DT, RES)
                     advect_time += time.time() - advect_start
 
                     sample_start = time.time()
@@ -199,7 +202,12 @@ for RUN_GPU in [True, ]:
                     vy_data_numba = cuda.as_cuda_array(vy_data)
                     sample_time = time.time() - sample_start
 
-                    utils.buoyancy2d[blocks_per_grid, threads_per_block](vy_data_numba, rho_data_numba, 9.81, RES)
+                    utils.buoyancy2d[blocks_per_grid, threads_per_block](vy_data_numba, rho_data_numba, 9.81, FLOW.buoyancy_factor, RES)
+
+                    print("Step {}".format(i))
+                    print(" - Mean value of rho: {}".format(np.mean(rho_data.cpu().data.numpy())))
+                    print(" - Mean value of vx : {}".format(np.mean(vx_data.cpu().data.numpy())))
+                    print(" - Mean value of vy : {}".format(np.mean(vy_data.cpu().data.numpy())))
 
                     sample_timings["GPU"][RES].append(sample_time)
                     inflow_timings["GPU"][RES].append(inflow_time)
@@ -245,7 +253,7 @@ for RUN_GPU in [True, ]:
                     vy_data_numba = cuda.as_cuda_array(vy_data)
                     vz_data_numba = cuda.as_cuda_array(vz_data)
 
-                    utils.buoyancy3d[blocks_per_grid, threads_per_block](vy_data_numba, rho_data_numba, 9.81, RES)
+                    utils.buoyancy3d[blocks_per_grid, threads_per_block](vy_data_numba, rho_data_numba, 9.81, FLOW.buoyancy_factor, RES)
 
                 if IS_PRESSURE:
                     pressure_solve_start = time.time()
@@ -254,7 +262,7 @@ for RUN_GPU in [True, ]:
 
                     pressure_time = pressure_solve_end - pressure_solve_start
 
-                if ANIMATE:
+                if ANIMATE or SAVE_IMAGE:
                     array = rho_data.cpu().data.numpy()
                     if len(array.shape) <= 4:
                         ima = np.reshape(array[0], [array.shape[1], array.shape[2]])  # remove channel dimension , 2d
@@ -264,9 +272,12 @@ for RUN_GPU in [True, ]:
                     fig = plt.figure()
                     ax = fig.add_subplot(1, 1, 1)
                     ax.contourf(ima, cmap='inferno')
-                    plt.draw()
-                    plt.pause(0.5)
-                    plt.close()
+                    if ANIMATE:
+                        plt.draw()
+                        plt.pause(0.5)
+                        plt.close()
+                    else:
+                        plt.savefig(os.path.join(IMG_PATH, "torchGPU_" + str(i) + ".png"))
 
         else:
             device = 'cpu'
@@ -346,6 +357,7 @@ for RUN_GPU in [True, ]:
                     plt.pause(0.5)
                     plt.close()
 
+
 sample_gpu_means = []
 advect_gpu_means = []
 inflow_gpu_means = []
@@ -411,4 +423,6 @@ ax_inflow.set_ylabel("Time (s)")
 ax_inflow.set_xticks(resolutions)
 ax_inflow.set_title("Inflow Patching")
 
-plt.show()
+fig_sample.savefig(os.path.join(IMG_PATH, "sample_performance.png"))
+fig_advect.savefig(os.path.join(IMG_PATH, "advect_performance.png"))
+fig_inflow.savefig(os.path.join(IMG_PATH, "inflow_performance.png"))
