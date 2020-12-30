@@ -30,7 +30,7 @@ inflow_timings = {"GPU": {}, "CPU": {}}
 advect_timings = {"GPU": {}, "CPU": {}}
 
 resolutions_float = np.linspace(100, 2000, 20)
-resolutions = [32,]
+resolutions = [32, 64, 128, 256, 512, 1024, 2048]
 for RUN_GPU in [True, False]:
     for RES in resolutions:
         FLOW = Fluid(Domain([RES] * DIM, boundaries=OPEN), batch_size=BATCH_SIZE, buoyancy_factor=0.2)
@@ -146,7 +146,7 @@ for RUN_GPU in [True, False]:
                     VY.data = VY.resample(VY.points, vy_boundary_array, vy_data_resample)
                     VX.update()
                     VY.update()
-                    sample_time = time.time() - sample_start
+                    sample_time += time.time() - sample_start
 
                     utils.buoyancy2d[blocks_per_grid, threads_per_block](VY.data_numba, RHO.data_numba, 9.81, FLOW.buoyancy_factor, RES)
 
@@ -334,7 +334,7 @@ for res, timings in sample_timings["GPU"].items():
 for res, timings in advect_timings["GPU"].items():
     advect_gpu_means.append(np.mean(np.asarray(timings)))
 
-for res, timings in sample_timings["GPU"].items():
+for res, timings in inflow_timings["GPU"].items():
     inflow_gpu_means.append(np.mean(np.asarray(timings)))
 
 for res, timings in sample_timings["CPU"].items():
@@ -343,13 +343,13 @@ for res, timings in sample_timings["CPU"].items():
 for res, timings in advect_timings["CPU"].items():
     advect_cpu_means.append(np.mean(np.asarray(timings)))
 
-for res, timings in sample_timings["CPU"].items():
+for res, timings in inflow_timings["CPU"].items():
     inflow_cpu_means.append(np.mean(np.asarray(timings)))
 
 
 plt.rcParams.update({
     'font.family': 'serif',
-    'font.size': 12,
+    'font.size': 8,
     'text.usetex': True
 })
 
