@@ -52,11 +52,11 @@ def patch_inflow3d(inflow_tensor, data, dt, res):
         data[0, i, j, k, 0] += inflow_tensor[0, i, j, k, 0] * dt
 
 @cuda.jit
-def global_to_local2d(points, size, lower, res):
+def global_to_local2d(points, size, lower, res, offset):
     i,j = cuda.grid(2)
     if i < res and j < res:
-        points[0, i, j, 0] = (points[0, i, j, 0] - lower[0])/(size[0]) * float(res) - 0.5
-        points[0, i, j, 1] = (points[0, i, j, 1] - lower[1])/(size[1]) * float(res) - 0.5
+        points[0, i, j, 0] = (points[0, i, j, 0] - lower[0])/(size[0]) * float(res) - offset[0]
+        points[0, i, j, 1] = (points[0, i, j, 1] - lower[1])/(size[1]) * float(res) - offset[1]
 
 @cuda.jit
 def global_to_local3d(points, size, lower, res):

@@ -22,12 +22,11 @@ void LaunchResampleKernel(
         const Boundary* __restrict__ boundaries
 );
 
-torch::Tensor resample_op(torch::Tensor data, torch::Tensor points, const torch::Tensor boundaries, torch::Tensor output)   {
+torch::Tensor resample_op(torch::Tensor data, torch::Tensor points, const torch::Tensor boundaries)   {
 
     CHECK_INPUT(data);
     CHECK_INPUT(points);
     CHECK_INPUT(boundaries);
-    CHECK_INPUT(output)
 
     // Prepare data access parameters
     assert(data.dim() >= 2);
@@ -54,10 +53,10 @@ torch::Tensor resample_op(torch::Tensor data, torch::Tensor points, const torch:
     // pointsSize
     const unsigned int pointsSize = points.numel();
 
-    // outputElementsPerBatch
-    const unsigned int outputElementsPerBatch = output.numel() / outputBatchSize;
-
     torch::Tensor outputTensor = torch::zeros_like(data);
+
+    // outputElementsPerBatch
+    const unsigned int outputElementsPerBatch = outputTensor.numel() / outputBatchSize;
 
     LaunchResampleKernel(
             dataBatchSize,
@@ -66,7 +65,7 @@ torch::Tensor resample_op(torch::Tensor data, torch::Tensor points, const torch:
             components,
             pointsSize,
             outputElementsPerBatch,
-            output.numel(),
+            outputTensor.numel(),
             data.data_ptr<float>(),
             points.data_ptr<float>(),
             outputTensor.data_ptr<float>(),
