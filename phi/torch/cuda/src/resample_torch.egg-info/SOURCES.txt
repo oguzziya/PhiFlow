@@ -1,4 +1,6 @@
 resample.cc
+resample_gradient.cc
+resample_gradient_kernel.cu
 resample_kernel.cu
 setup.py
 resample_torch.egg-info/PKG-INFO

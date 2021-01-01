@@ -1,1 +1,2 @@
 resample_torch_cuda
+resample_torch_gradient_cuda

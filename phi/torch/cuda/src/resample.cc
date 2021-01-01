@@ -53,7 +53,7 @@ torch::Tensor resample_op(torch::Tensor data, torch::Tensor points, const torch:
     // pointsSize
     const unsigned int pointsSize = points.numel();
 
-    torch::Tensor outputTensor = torch::zeros_like(data);
+    torch::Tensor outputTensor = torch::zeros_like(data, torch::dtype(torch::kFloat32).device(torch::kCUDA, 0));
 
     // outputElementsPerBatch
     const unsigned int outputElementsPerBatch = outputTensor.numel() / outputBatchSize;
