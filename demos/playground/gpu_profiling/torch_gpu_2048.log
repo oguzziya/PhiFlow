@@ -1,0 +1,52 @@
+==21595== NVPROF is profiling process 21595, command: python ../manual_torch.py gpu 2048
+/home/oguzziya/miniconda3/envs/phiflow-py36/lib/python3.6/site-packages/phi/viz/display.py:80: UserWarning: GUI is disabled because of missing dependencies: No module named 'dash_core_components'. To install all dependencies, run $ pip install phiflow[gui]
+  warnings.warn('GUI is disabled because of missing dependencies: %s. To install all dependencies, run $ pip install phiflow[gui]' % import_error)
+==21595== Profiling application: python ../manual_torch.py gpu 2048
+==21595== Profiling result:
+            Type  Time(%)      Time     Calls       Avg       Min       Max  Name
+ GPU activities:   97.66%  31.6941s        90  352.16ms  351.10ms  353.01ms  void torch_cuda::ResampleCudaKernel<float>(unsigned int, int, unsigned int const *, unsigned int, unsigned int, unsigned int, unsigned int, float const *, float const , unsigned int const **, Boundary const *, float const *)
+                    1.36%  442.01ms        90  4.9112ms  4.8360ms  5.0350ms  cudapy::utils_gpu::global_to_local2d$242(Array<float, int=4, C, mutable, aligned>, Array<float, int=1, C, mutable, aligned>, Array<float, int=1, C, mutable, aligned>, __int64, Array<float, int=1, C, mutable, aligned>)
+                    0.59%  192.03ms        30  6.4009ms  6.2646ms  6.5394ms  cudapy::utils_gpu::semi_lagrangian_update2d$243(Array<float, int=4, C, mutable, aligned>, Array<float, int=4, C, mutable, aligned>, Array<float, int=4, C, mutable, aligned>, double, __int64)
+                    0.11%  36.881ms       115  320.70us     544ns  4.6320ms  [CUDA memcpy HtoD]
+                    0.10%  33.747ms        10  3.3747ms  3.2169ms  3.4055ms  cudapy::utils_gpu::buoyancy2d$245(Array<float, int=4, C, mutable, aligned>, Array<float, int=4, C, mutable, aligned>, double, double, __int64)
+                    0.10%  32.992ms        10  3.2992ms  3.1788ms  3.3237ms  cudapy::utils_gpu::patch_inflow2d$244(Array<float, int=4, C, mutable, aligned>, Array<float, int=4, C, mutable, aligned>, double, __int64)
+                    0.06%  20.964ms        90  232.93us  227.87us  238.59us  void at::native::vectorized_elementwise_kernel<int=4, at::native::FillFunctor<float>, at::detail::Array<char*, int=1>>(int, float, at::native::FillFunctor<float>)
+                    0.00%  997.83us         1  997.83us  997.83us  997.83us  cudapy::utils_gpu::initialize_data2d$241(Array<float, int=4, C, mutable, aligned>, __int64)
+      API calls:   90.95%  31.6948s        90  352.16ms  351.10ms  353.02ms  cudaDeviceSynchronize
+                    7.16%  2.49407s       197  12.660ms  107.23us  2.37996s  cudaMalloc
+                    1.70%  590.94ms        90  6.5660ms  3.3909ms  10.566ms  cudaMemcpy
+                    0.11%  37.756ms        25  1.5102ms  6.6770us  4.7173ms  cudaMemcpyAsync
+                    0.05%  16.951ms       180  94.170us  53.001us  138.31us  cudaFree
+                    0.01%  2.0581ms       180  11.434us  9.5130us  31.581us  cudaLaunchKernel
+                    0.01%  1.8053ms       141  12.803us  10.977us  28.384us  cuLaunchKernel
+                    0.01%  1.7667ms        25  70.666us  6.2330us  608.34us  cudaStreamSynchronize
+                    0.00%  1.3823ms      2880     479ns     433ns  9.6080us  cudaOccupancyMaxActiveBlocksPerMultiprocessorWithFlags
+                    0.00%  1.1095ms         5  221.91us  201.11us  270.53us  cuModuleLoadDataEx
+                    0.00%  880.91us      2051     429ns     244ns  4.8530us  cudaGetDevice
+                    0.00%  584.72us         5  116.94us  100.58us  148.38us  cuLinkAddData
+                    0.00%  527.23us         5  105.45us  97.165us  126.00us  cuLinkComplete
+                    0.00%  350.91us       562     624ns     362ns  3.7650us  cuPointerGetAttribute
+                    0.00%  317.33us       854     371ns     176ns  2.1370us  cuCtxGetCurrent
+                    0.00%  268.85us        90  2.9870us  2.8080us  4.2480us  cudaFuncGetAttributes
+                    0.00%  227.70us         5  45.539us  44.563us  46.752us  cuLinkCreate
+                    0.00%  205.14us         2  102.57us  99.374us  105.77us  cudaGetDeviceProperties
+                    0.00%  194.40us       854     227ns     140ns  1.1630us  cuCtxGetDevice
+                    0.00%  158.70us         1  158.70us  158.70us  158.70us  cuDeviceTotalMem
+                    0.00%  134.05us       360     372ns     253ns  1.1730us  cudaDeviceGetAttribute
+                    0.00%  123.53us        97  1.2730us     117ns  54.077us  cuDeviceGetAttribute
+                    0.00%  68.587us         2  34.293us  24.226us  44.361us  cuDeviceGetName
+                    0.00%  29.399us         1  29.399us  29.399us  29.399us  cuMemGetInfo
+                    0.00%  21.882us        90     243ns     200ns     409ns  cudaGetLastError
+                    0.00%  7.9030us         5  1.5800us  1.4480us  1.6790us  cuLinkDestroy
+                    0.00%  7.5670us         1  7.5670us  7.5670us  7.5670us  cuDeviceGetPCIBusId
+                    0.00%  6.6870us        25     267ns     149ns     650ns  cuFuncGetAttribute
+                    0.00%  6.5990us         5  1.3190us  1.2040us  1.4840us  cuModuleGetFunction
+                    0.00%  4.5270us         3  1.5090us     229ns  3.8290us  cuDeviceGet
+                    0.00%  3.0290us         1  3.0290us  3.0290us  3.0290us  cuInit
+                    0.00%  2.0840us         2  1.0420us     597ns  1.4870us  cudaSetDevice
+                    0.00%  2.0680us         4     517ns     117ns     788ns  cuDeviceGetCount
+                    0.00%  1.3180us         1  1.3180us  1.3180us  1.3180us  cudaRuntimeGetVersion
+                    0.00%     747ns         1     747ns     747ns     747ns  cuDevicePrimaryCtxRetain
+                    0.00%     744ns         1     744ns     744ns     744ns  cuDeviceComputeCapability
+                    0.00%     710ns         3     236ns     124ns     459ns  cudaGetDeviceCount
+                    0.00%     199ns         1     199ns     199ns     199ns  cuDeviceGetUuid

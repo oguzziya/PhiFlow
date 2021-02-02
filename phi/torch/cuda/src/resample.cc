@@ -41,19 +41,21 @@ torch::Tensor resample_op(torch::Tensor data, torch::Tensor points, const torch:
     assert(dims == boundaries.size(0) && boundaries.size(1) == 2);
     // dimSizes
     unsigned int dimSizes[dims];
-    unsigned int outputDims[dims];
+    std::vector<int> outputDims(dims+2);
+    outputDims[0] = 1;
+    outputDims[dims-1] = 1;
     for(int i = 0; i < dims; i++){
         dimSizes[i] = data.size(i + 1);
     }
-    for(int i = 0; i < dims; i++){
-        outputDims[i] = points.size(i + 1);
+    for(int i = 1; i < dims+1; i++){
+        outputDims[i] = points.size(i);
     }
     // components
     const unsigned int components = data.size(data.dim() - 1);
     // pointsSize
     const unsigned int pointsSize = points.numel();
 
-    torch::Tensor outputTensor = torch::zeros_like(data, torch::dtype(torch::kFloat32).device(torch::kCUDA, 0));
+    torch::Tensor outputTensor = torch::zeros({1, outputDims[1], outputDims[2], 1}, torch::dtype(torch::kFloat32).device(torch::kCUDA, 0));
 
     // outputElementsPerBatch
     const unsigned int outputElementsPerBatch = outputTensor.numel() / outputBatchSize;

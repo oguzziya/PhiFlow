@@ -1,0 +1,11 @@
+/home/oguzziya/miniconda3/envs/phiflow-py36/lib/python3.6/site-packages/phi/viz/display.py:80: UserWarning: GUI is disabled because of missing dependencies: No module named 'dash_core_components'. To install all dependencies, run $ pip install phiflow[gui]
+  warnings.warn('GUI is disabled because of missing dependencies: %s. To install all dependencies, run $ pip install phiflow[gui]' % import_error)
+Traceback (most recent call last):
+  File "manual_torch.py", line 229, in <module>
+    run()
+  File "manual_torch.py", line 222, in run
+    resolutions = [int(res) for res in sys.argv[2:]]
+  File "manual_torch.py", line 222, in <listcomp>
+    resolutions = [int(res) for res in sys.argv[2:]]
+ValueError: invalid literal for int() with base 10: '.log'
+======== Error: Application received signal 2

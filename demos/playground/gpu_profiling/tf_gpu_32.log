@@ -1,0 +1,157 @@
+/home/oguzziya/miniconda3/envs/phiflow-py36/lib/python3.6/site-packages/tensorflow/python/framework/dtypes.py:516: FutureWarning: Passing (type, 1) or '1type' as a synonym of type is deprecated; in a future version of numpy, it will be understood as (type, (1,)) / '(1,)type'.
+  _np_qint8 = np.dtype([("qint8", np.int8, 1)])
+/home/oguzziya/miniconda3/envs/phiflow-py36/lib/python3.6/site-packages/tensorflow/python/framework/dtypes.py:517: FutureWarning: Passing (type, 1) or '1type' as a synonym of type is deprecated; in a future version of numpy, it will be understood as (type, (1,)) / '(1,)type'.
+  _np_quint8 = np.dtype([("quint8", np.uint8, 1)])
+/home/oguzziya/miniconda3/envs/phiflow-py36/lib/python3.6/site-packages/tensorflow/python/framework/dtypes.py:518: FutureWarning: Passing (type, 1) or '1type' as a synonym of type is deprecated; in a future version of numpy, it will be understood as (type, (1,)) / '(1,)type'.
+  _np_qint16 = np.dtype([("qint16", np.int16, 1)])
+/home/oguzziya/miniconda3/envs/phiflow-py36/lib/python3.6/site-packages/tensorflow/python/framework/dtypes.py:519: FutureWarning: Passing (type, 1) or '1type' as a synonym of type is deprecated; in a future version of numpy, it will be understood as (type, (1,)) / '(1,)type'.
+  _np_quint16 = np.dtype([("quint16", np.uint16, 1)])
+/home/oguzziya/miniconda3/envs/phiflow-py36/lib/python3.6/site-packages/tensorflow/python/framework/dtypes.py:520: FutureWarning: Passing (type, 1) or '1type' as a synonym of type is deprecated; in a future version of numpy, it will be understood as (type, (1,)) / '(1,)type'.
+  _np_qint32 = np.dtype([("qint32", np.int32, 1)])
+/home/oguzziya/miniconda3/envs/phiflow-py36/lib/python3.6/site-packages/tensorflow/python/framework/dtypes.py:525: FutureWarning: Passing (type, 1) or '1type' as a synonym of type is deprecated; in a future version of numpy, it will be understood as (type, (1,)) / '(1,)type'.
+  np_resource = np.dtype([("resource", np.ubyte, 1)])
+/home/oguzziya/miniconda3/envs/phiflow-py36/lib/python3.6/site-packages/tensorboard/compat/tensorflow_stub/dtypes.py:541: FutureWarning: Passing (type, 1) or '1type' as a synonym of type is deprecated; in a future version of numpy, it will be understood as (type, (1,)) / '(1,)type'.
+  _np_qint8 = np.dtype([("qint8", np.int8, 1)])
+/home/oguzziya/miniconda3/envs/phiflow-py36/lib/python3.6/site-packages/tensorboard/compat/tensorflow_stub/dtypes.py:542: FutureWarning: Passing (type, 1) or '1type' as a synonym of type is deprecated; in a future version of numpy, it will be understood as (type, (1,)) / '(1,)type'.
+  _np_quint8 = np.dtype([("quint8", np.uint8, 1)])
+/home/oguzziya/miniconda3/envs/phiflow-py36/lib/python3.6/site-packages/tensorboard/compat/tensorflow_stub/dtypes.py:543: FutureWarning: Passing (type, 1) or '1type' as a synonym of type is deprecated; in a future version of numpy, it will be understood as (type, (1,)) / '(1,)type'.
+  _np_qint16 = np.dtype([("qint16", np.int16, 1)])
+/home/oguzziya/miniconda3/envs/phiflow-py36/lib/python3.6/site-packages/tensorboard/compat/tensorflow_stub/dtypes.py:544: FutureWarning: Passing (type, 1) or '1type' as a synonym of type is deprecated; in a future version of numpy, it will be understood as (type, (1,)) / '(1,)type'.
+  _np_quint16 = np.dtype([("quint16", np.uint16, 1)])
+/home/oguzziya/miniconda3/envs/phiflow-py36/lib/python3.6/site-packages/tensorboard/compat/tensorflow_stub/dtypes.py:545: FutureWarning: Passing (type, 1) or '1type' as a synonym of type is deprecated; in a future version of numpy, it will be understood as (type, (1,)) / '(1,)type'.
+  _np_qint32 = np.dtype([("qint32", np.int32, 1)])
+/home/oguzziya/miniconda3/envs/phiflow-py36/lib/python3.6/site-packages/tensorboard/compat/tensorflow_stub/dtypes.py:550: FutureWarning: Passing (type, 1) or '1type' as a synonym of type is deprecated; in a future version of numpy, it will be understood as (type, (1,)) / '(1,)type'.
+  np_resource = np.dtype([("resource", np.ubyte, 1)])
+/home/oguzziya/miniconda3/envs/phiflow-py36/lib/python3.6/site-packages/phi/viz/display.py:80: UserWarning: GUI is disabled because of missing dependencies: No module named 'dash_core_components'. To install all dependencies, run $ pip install phiflow[gui]
+  warnings.warn('GUI is disabled because of missing dependencies: %s. To install all dependencies, run $ pip install phiflow[gui]' % import_error)
+WARNING:tensorflow:From /home/oguzziya/miniconda3/envs/phiflow-py36/lib/python3.6/site-packages/phi/tf/util.py:119: The name tf.AUTO_REUSE is deprecated. Please use tf.compat.v1.AUTO_REUSE instead.
+
+WARNING:tensorflow:From /home/oguzziya/miniconda3/envs/phiflow-py36/lib/python3.6/site-packages/phi/tf/profiling.py:12: The name tf.RunOptions is deprecated. Please use tf.compat.v1.RunOptions instead.
+
+WARNING:tensorflow:From /home/oguzziya/miniconda3/envs/phiflow-py36/lib/python3.6/site-packages/phi/tf/profiling.py:13: The name tf.RunMetadata is deprecated. Please use tf.compat.v1.RunMetadata instead.
+
+/home/oguzziya/miniconda3/envs/phiflow-py36/lib/python3.6/site-packages/phi/tf/flow.py:15: UserWarning: TensorFlow-CUDA solver is not available. To compile it, download phiflow sources and run
+$ python setup.py tf_cuda
+before reinstalling phiflow.
+  warnings.warn("TensorFlow-CUDA solver is not available. To compile it, download phiflow sources and run\n$ python setup.py tf_cuda\nbefore reinstalling phiflow.")
+WARNING:tensorflow:From /home/oguzziya/miniconda3/envs/phiflow-py36/lib/python3.6/site-packages/phi/tf/session.py:17: The name tf.Session is deprecated. Please use tf.compat.v1.Session instead.
+
+2021-01-12 19:20:36.125375: I tensorflow/stream_executor/platform/default/dso_loader.cc:42] Successfully opened dynamic library libcuda.so.1
+==23720== NVPROF is profiling process 23720, command: python ../manual_fluid_numpy_or_tf.py 32
+2021-01-12 19:20:36.368660: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:1005] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2021-01-12 19:20:36.369769: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1640] Found device 0 with properties: 
+name: GeForce GTX 960M major: 5 minor: 0 memoryClockRate(GHz): 1.176
+pciBusID: 0000:01:00.0
+2021-01-12 19:20:36.372202: I tensorflow/stream_executor/platform/default/dso_loader.cc:42] Successfully opened dynamic library libcudart.so.10.1
+2021-01-12 19:20:36.421568: I tensorflow/stream_executor/platform/default/dso_loader.cc:42] Successfully opened dynamic library libcublas.so.10
+2021-01-12 19:20:36.447931: I tensorflow/stream_executor/platform/default/dso_loader.cc:42] Successfully opened dynamic library libcufft.so.10
+2021-01-12 19:20:36.454486: I tensorflow/stream_executor/platform/default/dso_loader.cc:42] Successfully opened dynamic library libcurand.so.10
+2021-01-12 19:20:36.505064: I tensorflow/stream_executor/platform/default/dso_loader.cc:42] Successfully opened dynamic library libcusolver.so.10
+2021-01-12 19:20:36.512075: I tensorflow/stream_executor/platform/default/dso_loader.cc:42] Successfully opened dynamic library libcusparse.so.10
+2021-01-12 19:20:36.606673: I tensorflow/stream_executor/platform/default/dso_loader.cc:42] Successfully opened dynamic library libcudnn.so.7
+2021-01-12 19:20:36.606894: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:1005] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2021-01-12 19:20:36.607956: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:1005] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2021-01-12 19:20:36.608483: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1763] Adding visible gpu devices: 0
+2021-01-12 19:20:36.609330: I tensorflow/core/platform/cpu_feature_guard.cc:142] Your CPU supports instructions that this TensorFlow binary was not compiled to use: SSE4.1 SSE4.2 AVX AVX2 FMA
+2021-01-12 19:20:36.632327: I tensorflow/core/platform/profile_utils/cpu_utils.cc:94] CPU Frequency: 2594070000 Hz
+2021-01-12 19:20:36.633465: I tensorflow/compiler/xla/service/service.cc:168] XLA service 0x5555d12330b0 executing computations on platform Host. Devices:
+2021-01-12 19:20:36.633741: I tensorflow/compiler/xla/service/service.cc:175]   StreamExecutor device (0): <undefined>, <undefined>
+2021-01-12 19:20:36.635427: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:1005] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2021-01-12 19:20:36.636543: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1640] Found device 0 with properties: 
+name: GeForce GTX 960M major: 5 minor: 0 memoryClockRate(GHz): 1.176
+pciBusID: 0000:01:00.0
+2021-01-12 19:20:36.636600: I tensorflow/stream_executor/platform/default/dso_loader.cc:42] Successfully opened dynamic library libcudart.so.10.1
+2021-01-12 19:20:36.636624: I tensorflow/stream_executor/platform/default/dso_loader.cc:42] Successfully opened dynamic library libcublas.so.10
+2021-01-12 19:20:36.636647: I tensorflow/stream_executor/platform/default/dso_loader.cc:42] Successfully opened dynamic library libcufft.so.10
+2021-01-12 19:20:36.636668: I tensorflow/stream_executor/platform/default/dso_loader.cc:42] Successfully opened dynamic library libcurand.so.10
+2021-01-12 19:20:36.636689: I tensorflow/stream_executor/platform/default/dso_loader.cc:42] Successfully opened dynamic library libcusolver.so.10
+2021-01-12 19:20:36.636710: I tensorflow/stream_executor/platform/default/dso_loader.cc:42] Successfully opened dynamic library libcusparse.so.10
+2021-01-12 19:20:36.636731: I tensorflow/stream_executor/platform/default/dso_loader.cc:42] Successfully opened dynamic library libcudnn.so.7
+2021-01-12 19:20:36.636818: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:1005] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2021-01-12 19:20:36.637612: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:1005] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2021-01-12 19:20:36.638353: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1763] Adding visible gpu devices: 0
+2021-01-12 19:20:36.639096: I tensorflow/stream_executor/platform/default/dso_loader.cc:42] Successfully opened dynamic library libcudart.so.10.1
+2021-01-12 19:20:36.807287: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1181] Device interconnect StreamExecutor with strength 1 edge matrix:
+2021-01-12 19:20:36.807335: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1187]      0 
+2021-01-12 19:20:36.807347: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1200] 0:   N 
+2021-01-12 19:20:36.807555: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:1005] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2021-01-12 19:20:36.808212: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:1005] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2021-01-12 19:20:36.808788: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:1005] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2021-01-12 19:20:36.809300: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1326] Created TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:0 with 3642 MB memory) -> physical GPU (device: 0, name: GeForce GTX 960M, pci bus id: 0000:01:00.0, compute capability: 5.0)
+2021-01-12 19:20:36.812261: I tensorflow/compiler/xla/service/service.cc:168] XLA service 0x5555d79635c0 executing computations on platform CUDA. Devices:
+2021-01-12 19:20:36.812290: I tensorflow/compiler/xla/service/service.cc:175]   StreamExecutor device (0): GeForce GTX 960M, Compute Capability 5.0
+WARNING:tensorflow:From /home/oguzziya/miniconda3/envs/phiflow-py36/lib/python3.6/site-packages/phi/tf/session.py:18: The name tf.get_default_graph is deprecated. Please use tf.compat.v1.get_default_graph instead.
+
+Could not load resample cuda libraries: CUDA binaries not found at /home/oguzziya/miniconda3/envs/phiflow-py36/lib/python3.6/site-packages/phi/tf/cuda/build/resample.so. Run "python setup.py cuda" to compile them
+==23720== Profiling application: python ../manual_fluid_numpy_or_tf.py 32
+==23720== Profiling result:
+            Type  Time(%)      Time     Calls       Avg       Min       Max  Name
+ GPU activities:   15.04%  3.8071ms      1920  1.9820us  1.8880us  7.0400us  void tensorflow::functor::BlockReduceKernel<float*, float*, int=256, tensorflow::functor::Sum<float>>(float*, float*, int, float, std::iterator_traits<tensorflow::functor::BlockReduceKernel<float*, float*, int=256, tensorflow::functor::Sum<float>>>::value_type)
+                   11.90%  3.0138ms      2082  1.4470us  1.2480us  1.6320us  void Eigen::internal::EigenMetaKernel<Eigen::TensorEvaluator<Eigen::TensorAssignOp<Eigen::TensorMap<Eigen::Tensor<float, int=1, int=1, int>, int=16, Eigen::MakePointer>, Eigen::TensorCwiseBinaryOp<Eigen::internal::scalar_product_op<float, float>, Eigen::TensorMap<Eigen::Tensor<float const , int=1, int=1, int>, int=16, Eigen::MakePointer> const , Eigen::TensorMap<Eigen::Tensor<float const , int=1, int=1, long>, int=16, Eigen::MakePointer> const > const > const , Eigen::GpuDevice>, long>(float, int=1)
+                    8.86%  2.2432ms      1280  1.7520us  1.5360us  3.2960us  void Eigen::internal::EigenMetaKernel<Eigen::TensorEvaluator<Eigen::TensorAssignOp<Eigen::TensorMap<Eigen::Tensor<float, int=1, int=1, int>, int=16, Eigen::MakePointer>, Eigen::TensorCwiseUnaryOp<Eigen::internal::scalar_right<float, float, Eigen::internal::div_no_nan_op<float>>, Eigen::TensorMap<Eigen::Tensor<float const , int=1, int=1, int>, int=16, Eigen::MakePointer> const > const > const , Eigen::GpuDevice>, int>(float, int=1)
+                    8.05%  2.0388ms       652  3.1260us  2.8800us  4.7360us  void tensorflow::SparseTensorDenseMatMulKernel<float, __int64, bool=0, bool=0>(int, int, int, int, int, __int64 const *, float const *, float const , __int64 const **)
+                    7.86%  1.9902ms      1406  1.4150us  1.3440us  2.0480us  void Eigen::internal::EigenMetaKernel<Eigen::TensorEvaluator<Eigen::TensorAssignOp<Eigen::TensorMap<Eigen::Tensor<float, int=1, int=1, int>, int=16, Eigen::MakePointer>, Eigen::TensorCwiseBinaryOp<Eigen::internal::scalar_difference_op<float, float>, Eigen::TensorMap<Eigen::Tensor<float const , int=1, int=1, int>, int=16, Eigen::MakePointer> const , Eigen::TensorMap<Eigen::Tensor<float const , int=1, int=1, long>, int=16, Eigen::MakePointer> const > const > const , Eigen::GpuDevice>, long>(float, int=1)
+                    7.63%  1.9308ms      1373  1.4060us  1.2160us  2.1440us  void Eigen::internal::EigenMetaKernel<Eigen::TensorEvaluator<Eigen::TensorAssignOp<Eigen::TensorMap<Eigen::Tensor<float, int=1, int=1, int>, int=16, Eigen::MakePointer>, Eigen::TensorCwiseUnaryOp<Eigen::internal::scalar_right<float, float, Eigen::internal::scalar_product_op<float, float>>, Eigen::TensorMap<Eigen::Tensor<float const , int=1, int=1, int>, int=16, Eigen::MakePointer> const > const > const , Eigen::GpuDevice>, int>(float, int=1)
+                    5.57%  1.4112ms       649  2.1740us  2.1120us  2.7520us  void tensorflow::functor::BlockReduceKernel<float*, float*, int=256, cub::Max>(float*, float*, int, cub::Max, std::iterator_traits<tensorflow::functor::BlockReduceKernel<float*, float*, int=256, cub::Max>>::value_type)
+                    4.62%  1.1685ms       814  1.4350us  1.2160us  1.9850us  void Eigen::internal::EigenMetaKernel<Eigen::TensorEvaluator<Eigen::TensorAssignOp<Eigen::TensorMap<Eigen::Tensor<float, int=1, int=1, int>, int=16, Eigen::MakePointer>, Eigen::TensorCwiseBinaryOp<Eigen::internal::scalar_sum_op<float, float>, Eigen::TensorMap<Eigen::Tensor<float const , int=1, int=1, int>, int=16, Eigen::MakePointer> const , Eigen::TensorMap<Eigen::Tensor<float const , int=1, int=1, long>, int=16, Eigen::MakePointer> const > const > const , Eigen::GpuDevice>, long>(float, int=1)
+                    4.53%  1.1462ms      1337     857ns     800ns  5.4400us  [CUDA memcpy DtoH]
+                    3.54%  896.58us       649  1.3810us  1.2800us  1.6960us  void Eigen::internal::EigenMetaKernel<Eigen::TensorEvaluator<Eigen::TensorAssignOp<Eigen::TensorMap<Eigen::Tensor<float, int=1, int=1, int>, int=16, Eigen::MakePointer>, Eigen::TensorCwiseUnaryOp<Eigen::internal::scalar_abs_op<float>, Eigen::TensorMap<Eigen::Tensor<float const , int=1, int=1, int>, int=16, Eigen::MakePointer> const > const > const , Eigen::GpuDevice>, int>(float, int=1)
+                    3.50%  885.06us       649  1.3630us  1.2160us  1.7920us  void Eigen::internal::EigenMetaKernel<Eigen::TensorEvaluator<Eigen::TensorAssignOp<Eigen::TensorMap<Eigen::Tensor<bool, int=1, int=1, int>, int=16, Eigen::MakePointer>, Eigen::TensorCwiseUnaryOp<Eigen::internal::scalar_right<bool, bool, Eigen::internal::scalar_boolean_and_op>, Eigen::TensorMap<Eigen::Tensor<bool const , int=1, int=1, int>, int=16, Eigen::MakePointer> const > const > const , Eigen::GpuDevice>, int>(bool, int=1)
+                    3.45%  873.48us       640  1.3640us  1.3120us  1.7600us  void Eigen::internal::EigenMetaKernel<Eigen::TensorEvaluator<Eigen::TensorAssignOp<Eigen::TensorMap<Eigen::Tensor<float, int=1, int=1, int>, int=16, Eigen::MakePointer>, Eigen::TensorCwiseUnaryOp<Eigen::internal::scalar_left<float, float, Eigen::internal::scalar_product_op<float, float>>, Eigen::TensorMap<Eigen::Tensor<float const , int=1, int=1, int>, int=16, Eigen::MakePointer> const > const > const , Eigen::GpuDevice>, int>(float, int=1)
+                    3.31%  837.19us       652  1.2840us  1.1520us  1.6000us  void Eigen::internal::EigenMetaKernel<Eigen::TensorEvaluator<Eigen::TensorAssignOp<Eigen::TensorMap<Eigen::Tensor<float, int=2, int=1, long>, int=16, Eigen::MakePointer>, Eigen::TensorCwiseNullaryOp<Eigen::internal::scalar_constant_op<float>, Eigen::TensorMap<Eigen::Tensor<float, int=2, int=1, long>, int=16, Eigen::MakePointer> const > const > const , Eigen::GpuDevice>, long>(float, int=2)
+                    3.18%  806.12us       649  1.2420us  1.1200us  1.7280us  void Eigen::internal::EigenMetaKernel<Eigen::TensorEvaluator<Eigen::TensorAssignOp<Eigen::TensorMap<Eigen::Tensor<bool, int=1, int=1, int>, int=16, Eigen::MakePointer>, Eigen::TensorCwiseUnaryOp<Eigen::internal::scalar_right<bool, float, Eigen::internal::greater<float>>, Eigen::TensorMap<Eigen::Tensor<float const , int=1, int=1, int>, int=16, Eigen::MakePointer> const > const > const , Eigen::GpuDevice>, int>(bool, int=1)
+                    2.71%  685.45us       796     861ns     544ns  8.7040us  [CUDA memcpy HtoD]
+                    1.14%  288.32us       144  2.0020us  1.8560us  2.4640us  void Eigen::internal::EigenMetaKernel<Eigen::TensorEvaluator<Eigen::TensorAssignOp<Eigen::TensorMap<Eigen::Tensor<float, int=4, int=1, int>, int=16, Eigen::MakePointer>, Eigen::TensorSlicingOp<Eigen::DSizes<int, int=4> const , Eigen::DSizes<int, int=4> const , Eigen::TensorMap<Eigen::Tensor<float const , int=4, int=1, int>, int=16, Eigen::MakePointer> const > const > const , Eigen::GpuDevice>, int>(float, int=4)
+                    0.95%  239.46us       108  2.2170us  2.0480us  2.5920us  void tensorflow::GatherSliceOpKernel<float, int, int=3>(float const *, int const *, tensorflow::GatherSliceOpKernel<float, int, int=3>*, Eigen::array<__int64, int=3>, Eigen::array, __int64, __int64, __int64)
+                    0.80%  201.47us        27  7.4620us  6.6240us  12.640us  void Eigen::internal::EigenMetaKernel<Eigen::TensorEvaluator<Eigen::TensorAssignOp<Eigen::TensorMap<Eigen::Tensor<float, int=4, int=1, int>, int=16, Eigen::MakePointer>, Eigen::TensorPaddingOp<Eigen::array<Eigen::IndexPair<int>, unsigned long=4> const , Eigen::TensorMap<Eigen::Tensor<float const , int=4, int=1, int>, int=16, Eigen::MakePointer> const > const > const , Eigen::GpuDevice>, int>(float, int=4)
+                    0.72%  181.57us        42  4.3230us  2.0160us  12.256us  void Eigen::internal::EigenMetaKernel<Eigen::TensorEvaluator<Eigen::TensorAssignOp<Eigen::TensorMap<Eigen::Tensor<float, int=3, int=1, int>, int=16, Eigen::MakePointer>, Eigen::TensorPaddingOp<Eigen::array<Eigen::IndexPair<int>, unsigned long=3> const , Eigen::TensorMap<Eigen::Tensor<float const , int=3, int=1, int>, int=16, Eigen::MakePointer> const > const > const , Eigen::GpuDevice>, int>(float, int=3)
+                    0.67%  170.78us       108  1.5810us  1.4720us  1.8880us  void Eigen::internal::EigenMetaKernel<Eigen::TensorEvaluator<Eigen::TensorAssignOp<Eigen::TensorMap<Eigen::Tensor<float, int=2, int=1, int>, int=16, Eigen::MakePointer>, Eigen::TensorSlicingOp<Eigen::DSizes<long, int=2> const , Eigen::DSizes<long, int=2> const , Eigen::TensorMap<Eigen::Tensor<float const , int=2, int=1, int>, int=16, Eigen::MakePointer> const > const > const , Eigen::GpuDevice>, int>(float, int=2)
+                    0.43%  109.25us        36  3.0340us  2.9120us  3.5520us  void Eigen::internal::EigenMetaKernel<Eigen::TensorEvaluator<Eigen::TensorAssignOp<Eigen::TensorMap<Eigen::Tensor<float, int=4, int=1, int>, int=16, Eigen::MakePointer>, Eigen::TensorMirrorPadOp<Eigen::array<Eigen::IndexPair<int>, unsigned long=4>, Eigen::TensorMap<Eigen::Tensor<float const , int=4, int=1, int>, int=16, Eigen::MakePointer> const > const > const , Eigen::GpuDevice>, int>(float, int=4)
+                    0.33%  82.338us        54  1.5240us  1.3760us  1.9520us  void Eigen::internal::EigenMetaKernel<Eigen::TensorEvaluator<Eigen::TensorAssignOp<Eigen::TensorSlicingOp<Eigen::array<int, unsigned long=2> const , Eigen::array<int, unsigned long=2> const , Eigen::TensorMap<Eigen::Tensor<float, int=2, int=1, int>, int=16, Eigen::MakePointer>>, Eigen::TensorMap<Eigen::Tensor<float const , int=2, int=1, int>, int=16, Eigen::MakePointer> const > const , Eigen::GpuDevice>, int>(int, unsigned long=2)
+                    0.24%  60.896us        27  2.2550us  1.9520us  3.2960us  void Eigen::internal::EigenMetaKernel<Eigen::TensorEvaluator<Eigen::TensorAssignOp<Eigen::TensorMap<Eigen::Tensor<float, int=2, int=1, int>, int=16, Eigen::MakePointer>, Eigen::TensorCwiseBinaryOp<Eigen::internal::scalar_sum_op<float, float>, Eigen::TensorBroadcastingOp<Eigen::array<long, unsigned long=2> const , Eigen::TensorMap<Eigen::Tensor<float const , int=2, int=1, int>, int=16, Eigen::MakePointer> const > const , Eigen::TensorMap<Eigen::Tensor<float const , int=2, int=1, int>, int=16, Eigen::MakePointer> const > const > const , Eigen::GpuDevice>, int>(float, int=2)
+                    0.17%  42.784us        30  1.4260us  1.2800us  1.8240us  void Eigen::internal::EigenMetaKernel<Eigen::TensorEvaluator<Eigen::TensorAssignOp<Eigen::TensorMap<Eigen::Tensor<float, int=1, int=1, int>, int=16, Eigen::MakePointer>, Eigen::TensorCwiseUnaryOp<Eigen::internal::scalar_right<float, float, Eigen::internal::scalar_difference_op<float, float>>, Eigen::TensorMap<Eigen::Tensor<float const , int=1, int=1, int>, int=16, Eigen::MakePointer> const > const > const , Eigen::GpuDevice>, int>(float, int=1)
+                    0.16%  40.065us        18  2.2250us  1.9840us  3.1680us  void Eigen::internal::EigenMetaKernel<Eigen::TensorEvaluator<Eigen::TensorAssignOp<Eigen::TensorMap<Eigen::Tensor<float, int=2, int=1, int>, int=16, Eigen::MakePointer>, Eigen::TensorCwiseBinaryOp<Eigen::internal::scalar_difference_op<float, float>, Eigen::TensorMap<Eigen::Tensor<float const , int=2, int=1, int>, int=16, Eigen::MakePointer> const , Eigen::TensorBroadcastingOp<Eigen::array<long, unsigned long=2> const , Eigen::TensorMap<Eigen::Tensor<float const , int=2, int=1, int>, int=16, Eigen::MakePointer> const > const > const > const , Eigen::GpuDevice>, int>(float, int=2)
+                    0.16%  39.360us        27  1.4570us  1.3120us  1.7600us  void Eigen::internal::EigenMetaKernel<Eigen::TensorEvaluator<Eigen::TensorAssignOp<Eigen::TensorMap<Eigen::Tensor<float, int=1, int=1, int>, int=16, Eigen::MakePointer>, Eigen::TensorCwiseUnaryOp<Eigen::internal::scalar_floor_op<float>, Eigen::TensorMap<Eigen::Tensor<float const , int=1, int=1, int>, int=16, Eigen::MakePointer> const > const > const , Eigen::GpuDevice>, int>(float, int=1)
+                    0.16%  39.296us        27  1.4550us  1.3120us  1.9520us  void Eigen::internal::EigenMetaKernel<Eigen::TensorEvaluator<Eigen::TensorAssignOp<Eigen::TensorMap<Eigen::Tensor<float, int=1, int=1, int>, int=16, Eigen::MakePointer>, Eigen::TensorCwiseUnaryOp<Eigen::internal::scalar_left<float, float, Eigen::internal::scalar_difference_op<float, float>>, Eigen::TensorMap<Eigen::Tensor<float const , int=1, int=1, int>, int=16, Eigen::MakePointer> const > const > const , Eigen::GpuDevice>, int>(float, int=1)
+                    0.14%  34.816us        27  1.2890us  1.1520us  1.6320us  void Eigen::internal::EigenMetaKernel<Eigen::TensorEvaluator<Eigen::TensorAssignOp<Eigen::TensorMap<Eigen::Tensor<int, int=1, int=1, long>, int=16, Eigen::MakePointer>, Eigen::TensorConversionOp<int, Eigen::TensorMap<Eigen::Tensor<float const , int=1, int=1, long>, int=16, Eigen::MakePointer> const > const > const , Eigen::GpuDevice>, long>(int, int=1)
+                    0.09%  23.264us        18  1.2920us  1.0240us  5.1840us  [CUDA memcpy DtoD]
+                    0.06%  15.392us         9  1.7100us  1.5680us  2.6880us  void tensorflow::functor::ColumnReduceKernel<float*, float*, tensorflow::functor::Sum<float>>(float*, float*, int, int, float, std::iterator_traits<tensorflow::functor::ColumnReduceKernel<float*, float*, tensorflow::functor::Sum<float>>>::value_type)
+                    0.03%  7.6480us         3  2.5490us  2.2080us  3.2000us  void Eigen::internal::EigenMetaKernel<Eigen::TensorEvaluator<Eigen::TensorAssignOp<Eigen::TensorMap<Eigen::Tensor<float, int=2, int=1, int>, int=16, Eigen::MakePointer>, Eigen::TensorCwiseBinaryOp<Eigen::internal::scalar_product_op<float, float>, Eigen::TensorBroadcastingOp<Eigen::array<long, unsigned long=2> const , Eigen::TensorMap<Eigen::Tensor<float const , int=2, int=1, int>, int=16, Eigen::MakePointer> const > const , Eigen::TensorMap<Eigen::Tensor<float const , int=2, int=1, int>, int=16, Eigen::MakePointer> const > const > const , Eigen::GpuDevice>, int>(float, int=2)
+                    0.02%  5.0240us         3  1.6740us  1.6000us  1.8240us  void Eigen::internal::EigenMetaKernel<Eigen::TensorEvaluator<Eigen::TensorAssignOp<Eigen::TensorMap<Eigen::Tensor<float, int=1, int=1, long>, int=16, Eigen::MakePointer>, Eigen::TensorCwiseBinaryOp<Eigen::internal::scalar_sum_op<float const , float const >, Eigen::TensorMap<Eigen::Tensor<float const , int=1, int=1, long>, int=16, Eigen::MakePointer> const , Eigen::TensorMap<Eigen::Tensor<float const , int=1, int=1, long>, int=16, Eigen::MakePointer> const > const > const , Eigen::GpuDevice>, long>(float, int=1)
+                    0.01%  1.3760us         1  1.3760us  1.3760us  1.3760us  [CUDA memset]
+      API calls:   99.08%  23.1433s     14105  1.6408ms  4.2100us  3.28918s  cudaLaunchKernel
+                    0.71%  166.77ms         1  166.77ms  166.77ms  166.77ms  cudaFree
+                    0.04%  8.9740ms      4266  2.1030us     370ns  314.72us  cuEventRecord
+                    0.03%  8.1349ms      1337  6.0840us  3.6250us  56.529us  cuMemcpyDtoHAsync
+                    0.03%  7.1600ms       796  8.9950us  4.0750us  114.93us  cuMemcpyHtoDAsync
+                    0.02%  4.8940ms      4266  1.1470us     542ns  13.729us  cudaPointerGetAttributes
+                    0.02%  4.3460ms         1  4.3460ms  4.3460ms  4.3460ms  cuMemAlloc
+                    0.02%  4.0941ms       373  10.976us     194ns  546.76us  cuDeviceGetAttribute
+                    0.02%  3.8081ms      2678  1.4210us     644ns  12.567us  cuEventQuery
+                    0.01%  2.9841ms        11  271.28us  207.87us  293.39us  cuDeviceTotalMem
+                    0.01%  1.8273ms      2133     856ns     539ns  3.1290us  cuStreamWaitEvent
+                    0.00%  804.49us        10  80.449us  2.4630us  770.47us  cuDeviceGetPCIBusId
+                    0.00%  422.71us         1  422.71us  422.71us  422.71us  cuMemHostAlloc
+                    0.00%  301.67us         2  150.83us  123.72us  177.95us  cudaGetDeviceProperties
+                    0.00%  260.58us        11  23.688us  16.382us  50.661us  cuDeviceGetName
+                    0.00%  223.73us        10  22.373us  2.5740us  173.71us  cuStreamCreate
+                    0.00%  207.55us        18  11.530us  5.5950us  37.212us  cudaMemcpyAsync
+                    0.00%  38.507us         1  38.507us  38.507us  38.507us  cuMemGetInfo
+                    0.00%  21.524us         1  21.524us  21.524us  21.524us  cuMemsetD32
+                    0.00%  19.214us        11  1.7460us     488ns  2.8240us  cuCtxSetCurrent
+                    0.00%  16.957us        13  1.3040us     341ns  7.6750us  cuDeviceGet
+                    0.00%  15.651us        12  1.3040us     604ns  5.1640us  cuEventCreate
+                    0.00%  14.846us         3  4.9480us  4.5070us  5.2300us  cuCtxSynchronize
+                    0.00%  8.4800us        10     848ns     337ns  2.3400us  cuDeviceGetCount
+                    0.00%  6.4160us         2  3.2080us  3.0870us  3.3290us  cuInit
+                    0.00%  5.8090us        11     528ns     262ns  2.0250us  cuDriverGetVersion
+                    0.00%  4.9490us         2  2.4740us  1.9020us  3.0470us  cudaSetDevice
+                    0.00%  3.6150us         1  3.6150us  3.6150us  3.6150us  cudaGetDevice
+                    0.00%  2.7490us         1  2.7490us  2.7490us  2.7490us  cuDevicePrimaryCtxRelease
+                    0.00%  2.0000us         1  2.0000us  2.0000us  2.0000us  cudaGetDeviceCount
+                    0.00%  1.0440us         3     348ns     327ns     375ns  cudaGetLastError
+                    0.00%     767ns         2     383ns     335ns     432ns  cuDeviceGetUuid
+                    0.00%     664ns         1     664ns     664ns     664ns  cuDevicePrimaryCtxGetState
+                    0.00%     469ns         1     469ns     469ns     469ns  cuCtxGetDevice
+                    0.00%     431ns         1     431ns     431ns     431ns  cuDevicePrimaryCtxRetain
+                    0.00%     377ns         1     377ns     377ns     377ns  cuCtxGetCurrent
