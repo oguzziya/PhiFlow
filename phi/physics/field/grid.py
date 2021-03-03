@@ -110,10 +110,10 @@ class CenteredGrid(Field):
         assert interpolation == 'linear'
         return interpolation
 
-    def sample_at(self, points, device='cpu'):
+    def sample_at(self, points):
         local_points = self.box.global_to_local(points)
         local_points = math.mul(local_points, math.to_float(self.resolution)) - 0.5
-        resampled = math.resample(self.data, local_points, boundary=_pad_mode(self.extrapolation), interpolation=self.interpolation, constant_values=_pad_value(self.extrapolation_value), device=device)
+        resampled = math.resample(self.data, local_points, boundary=_pad_mode(self.extrapolation), interpolation=self.interpolation, constant_values=_pad_value(self.extrapolation_value))
         return resampled
 
     def general_sample_at(self, points, reduce):

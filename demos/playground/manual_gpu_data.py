@@ -5,6 +5,7 @@ from resample_torch_gradient_cuda import resample_gradient_op
 import utils_gpu as utils
 from copy import copy
 import time
+import torch.nn.functional as torchf
 
 class ManualGPUData:
     def __init__(self, field, device, dim, res, blocks, threads, boundaries, offset):
@@ -49,25 +50,25 @@ class ManualGPUData:
         self.data_grad_numba = cuda.as_cuda_array(self.data_grad)
         self.points_grad_numba = cuda.as_cuda_array(self.points_grad)
 
+    def global_to_local(self, coords):
+      coords[0,:,:,0] = (coords[0,:,:,0] - self.box_lower[0]) / self.box_sizes[0]
+      coords[0,:,:,1] = (coords[0,:,:,1] - self.box_lower[1]) / self.box_sizes[1]
+      return coords
+
     def resample(self, sample_coords):
         if self.dim == 2:
-            sample_coords[0, :, :, 0] = (sample_coords[0, :, :, 0] + self.box_lower[1]) / (self.box_sizes[1]) * float(self.res) - self.offset[0]
-            sample_coords[0, :, :, 1] = (sample_coords[0, :, :, 1] + self.box_lower[0]) / (self.box_sizes[0]) * float(self.res) - self.offset[1]
-            return resample_torch_cuda.resample_op(self.data, sample_coords, self.boundaries)
-
-        elif self.dim == 3:
-            utils.global_to_local3d[self.blocks, self.threads](sample_coords, self.box_sizes_numba, self.box_lower_numba, self.res, self.offset)
-            return copy(resample_torch_cuda.resample_op(self.data, sample_coords, self.boundaries))
+            local_coords = (sample_coords - self.box_lower) / self.box_sizes * float(self.res) - 0.5
+            local_coords = 2. * local_coords / (self.res - 1.) - 1.
+            local_coords = torch.flip(local_coords, dims=[-1])
+            result = torchf.grid_sample(self.data.permute(*((0, -1) + tuple(range(1, len(self.data.shape) - 1)))), local_coords, mode='bilinear', padding_mode='zeros', align_corners=True)
+            return result.permute((0,) + tuple(range(2, len(result.shape))) + (1,))
 
     def advect(self, vx, vy, dt):
 
-        self.vx_buffer = vx.resample(self.points)
-        self.vy_buffer = vy.resample(self.points)
-
-        self.points[0, :, :, 0] -= self.vy_buffer[0, :, :, 0] * dt
-        self.points[0, :, :, 1] -= self.vx_buffer[0, :, :, 0] * dt
-        
-        self.data = self.resample(self.points)
+        self.points = self.points - torch.cat((vy.resample(self.points), vx.resample(self.points)), 3) * dt
+        result = self.resample(self.points)
+        self.data = result
+        return result
 
 def advection_step2d(data, vx, vy, dt):
     profiling_dict = {"Resampling": 0.0 , "Advection": 0.0, "Step": 0}

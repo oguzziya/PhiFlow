@@ -11,7 +11,7 @@ def initialize_data2d(data, res):
     if i < res and j < res:
         if i >= (res // 10 * 1) and i < (res // 10 * 3):
             if j >= (res // 6 * 2) and j < (res // 6 * 3):
-                data[0, i, j, 0] = 0.1
+                data[0, i, j, 0] = -0.5
 @cuda.jit
 def initialize_data3d(data, res):
     i, j, k = cuda.grid(3)

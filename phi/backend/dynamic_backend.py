@@ -108,8 +108,8 @@ class DynamicBackend(Backend):
     def py_func(self, func, inputs, Tout, shape_out, stateful=True, name=None, grad=None):
         return self.choose_backend(inputs).py_func(func, inputs, Tout, shape_out, stateful, name, grad)
 
-    def resample(self, inputs, sample_coords, interpolation='linear', boundary='constant', constant_values=0, device='cpu'):
-        return self.choose_backend([inputs, sample_coords]).resample(inputs, sample_coords, interpolation=interpolation, boundary=boundary, constant_values=constant_values, device=device)
+    def resample(self, inputs, sample_coords, interpolation='linear', boundary='constant', constant_values=0):
+        return self.choose_backend([inputs, sample_coords]).resample(inputs, sample_coords, interpolation=interpolation, boundary=boundary, constant_values=constant_values)
 
     def range(self, start, limit=None, delta=1, dtype=None):
         return self.choose_backend([start, limit, delta]).range(start, limit, delta, dtype)

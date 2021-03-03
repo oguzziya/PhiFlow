@@ -51,11 +51,11 @@ def torch_cpu_manual(resolutions, steps, dimension):
         for i in range(STEPS):
 
             x_rho = torch_from_numpy(DENSITY.points.data)
-            v_rho = VELOCITY.sample_at(x_rho, device=device)
+            v_rho = VELOCITY.sample_at(x_rho)
 
             x_rho = utils.semi_lagrangian_update(x_rho, v_rho, DT)
 
-            x_rho = DENSITY.sample_at(x_rho, device)
+            x_rho = DENSITY.sample_at(x_rho)
 
             x_rho = utils.patch_inflow(inflow_tensor, x_rho, DT)
 
@@ -63,11 +63,11 @@ def torch_cpu_manual(resolutions, steps, dimension):
 
             for component in VELOCITY.unstack():
                 x_vel = torch_from_numpy(component.points.data)
-                v_vel = VELOCITY.sample_at(x_vel, device)
+                v_vel = VELOCITY.sample_at(x_vel)
 
                 x_vel = utils.semi_lagrangian_update(x_vel, v_vel, DT)
 
-                x_vel = component.sample_at(x_vel, device)
+                x_vel = component.sample_at(x_vel)
 
                 x_vel_list.append(x_vel)
 
@@ -90,7 +90,7 @@ def torch_cpu_manual(resolutions, steps, dimension):
                 else:
                     ima = array[0, :, array.shape[1] // 2, :, 0]  # 3d , middle z slice
                     ima = np.reshape(ima, [array.shape[1], array.shape[2]])  # remove channel dimension
-                cmap = plt.cm.get_cmap("winter")
+                cmap = plt.cm.get_cmap("inferno")
                 fig = plt.figure()
                 ax = fig.add_subplot(1, 1, 1)
                 cs = ax.contourf(ima, cmap=cmap)
@@ -101,6 +101,7 @@ def torch_cpu_manual(resolutions, steps, dimension):
                     plt.close()
                 else:
                     plt.savefig(os.path.join(IMG_PATH, "torchCPU_" + str(i) + ".png"))
+                    plt.close()
 
     return mean_dict
 
@@ -108,8 +109,8 @@ def torch_gpu_manual(resolutions, steps, dimension):
     import utils_gpu as utils
     from numba import cuda
 
-    device = "cuda:0"
-    SAVE_IMAGE = True
+    device = "cpu"
+    SAVE_IMAGE = False
     ANIMATE = False
     IS_PRESSURE = False
 
@@ -130,7 +131,7 @@ def torch_gpu_manual(resolutions, steps, dimension):
         FLOW = Fluid(Domain([RES] * DIM, boundaries=OPEN), batch_size=BATCH_SIZE, buoyancy_factor=0.2)
         FLOW_TORCH = torch_from_numpy(FLOW)
 
-        DENSITY = copy(FLOW_TORCH.density)
+        DENSITY = FLOW_TORCH.density
         VELOCITY = FLOW_TORCH.velocity
 
         # Set the GPU threads
@@ -141,8 +142,7 @@ def torch_gpu_manual(resolutions, steps, dimension):
             density_shape = [1, RES, RES, 1]
 
             inflow_tensor = torch.zeros(size=density_shape).to(device)
-            inflow_tensor_numba = cuda.as_cuda_array(inflow_tensor)
-            utils.initialize_data2d[blocks_per_grid, threads_per_block](inflow_tensor_numba, RES)
+            inflow_tensor[0, (RES // 10 * 1):(RES // 10 * 3), (RES // 6 * 2):(RES // 6 * 3), 0] = -0.5
 
         elif DIM == 3:
             threads_per_block = (8, 8, 8)
@@ -153,8 +153,8 @@ def torch_gpu_manual(resolutions, steps, dimension):
             inflow_tensor_numba = cuda.as_cuda_array(inflow_tensor.to(device))
             utils.initialize_data3d[blocks_per_grid, threads_per_block](inflow_tensor_numba, RES)
 
-        VEL_X = copy(VELOCITY.unstack()[1])
-        VEL_Y = copy(VELOCITY.unstack()[0])
+        VEL_X = VELOCITY.unstack()[1]
+        VEL_Y = VELOCITY.unstack()[0]
         if DIM == 3:
             VEL_Z = VELOCITY.unstack()[2]
 
@@ -171,6 +171,7 @@ def torch_gpu_manual(resolutions, steps, dimension):
         # Create Torch data on GPU and Numba pointers
         if DIM == 2:
             RHO = ManualGPUData(DENSITY, device, DIM, RES, blocks_per_grid, threads_per_block, rho_boundary_array, [0.0, 0.0])
+            RHO_BUO = copy(RHO)
             VX = ManualGPUData(VEL_X, device, DIM, RES, blocks_per_grid, threads_per_block, vx_boundary_array, [0.0, 0.5])
             VY = ManualGPUData(VEL_Y, device, DIM, RES, blocks_per_grid, threads_per_block, vy_boundary_array, [0.5, 0.0])
 
@@ -184,15 +185,14 @@ def torch_gpu_manual(resolutions, steps, dimension):
         for i in range(STEPS):
 
             if DIM == 2:            
-                RHO.advect(VX, VY, DT)
-                RHO.data += inflow_tensor * DT
-
-                VX.advect(VX, VY, DT)
-                VY.advect(VX, VY, DT)
+                RHO.data = RHO.advect(VX, VY, DT) + inflow_tensor * DT
+                VX.data = VX.advect(VX, VY, DT)
+                #RHO_BUO.data = RHO.data * 0.2 * (-9.81) 
+                #VY.data = VY.advect(VX, VY, DT) + RHO_BUO.resample(VY.points) * DT
+                VY.data = VY.advect(VX, VY, DT) + RHO.resample(VY.points) * DT * 0.2 * (-9.81)
                 
-                VX.data += RHO.resample(VX.points) * (-9.81) * FLOW.buoyancy_factor * DT
-
                 print("RHO Mean: {:5f} - VX Mean: {:5f} - VY Mean: {:5f}".format(torch.mean(RHO.data.cpu()), torch.mean(VX.data.cpu()), torch.mean(VY.data.cpu())))
+                
                 mean_dict["rho"].append(torch.mean(RHO.data.cpu()))
                 mean_dict["vx"].append(torch.mean(VX.data.cpu()))
                 mean_dict["vy"].append(torch.mean(VY.data.cpu()))
@@ -210,13 +210,13 @@ def torch_gpu_manual(resolutions, steps, dimension):
                                                                      FLOW.buoyancy_factor, RES)
 
             if ANIMATE or SAVE_IMAGE:
-                array = VY.data.cpu().data.numpy()
+                array = RHO.data.cpu().data.numpy()
                 if len(array.shape) <= 4:
                     ima = np.reshape(array[0], [array.shape[1], array.shape[2]])  # remove channel dimension , 2d
                 else:
                     ima = array[0, :, array.shape[1] // 2, :, 0]  # 3d , middle z slice
                     ima = np.reshape(ima, [array.shape[1], array.shape[2]])  # remove channel dimension
-                cmap = plt.cm.get_cmap("winter")
+                cmap = plt.cm.get_cmap("inferno")
                 fig = plt.figure()
                 ax = fig.add_subplot(1, 1, 1)
                 cs = ax.contourf(ima, cmap=cmap)
@@ -227,29 +227,28 @@ def torch_gpu_manual(resolutions, steps, dimension):
                     plt.close()
                 else:
                     plt.savefig(os.path.join(IMG_PATH, "torchGPU_" + str(i) + ".png"))
+                    plt.close()
     return mean_dict
 
 def run():
     resolutions = [int(res) for res in sys.argv[1:]]
     
-    steps = 100
-
-
-    cpu_means = torch_cpu_manual(resolutions, steps, 2)
-    print("-------------------------------------------")
+    steps = 20
+ 
+    #cpu_means = torch_cpu_manual(resolutions, steps, 2)
+    #print("-------------------------------------------")
     gpu_means = torch_gpu_manual(resolutions, steps, 2)
-   
 
-    rho_diff = np.square(np.asarray(gpu_means["rho"]) - np.asarray(cpu_means["rho"]))
-    vx_diff  = np.square(np.asarray(gpu_means["vx"]) - np.asarray(cpu_means["vx"]))
-    vy_diff  = np.square(np.asarray(gpu_means["vy"]) - np.asarray(cpu_means["vy"]))
+    # rho_diff = np.square(np.asarray(gpu_means["rho"]) - np.asarray(cpu_means["rho"]))
+    # vx_diff  = np.square(np.asarray(gpu_means["vx"]) - np.asarray(cpu_means["vx"]))
+    # vy_diff  = np.square(np.asarray(gpu_means["vy"]) - np.asarray(cpu_means["vy"]))
 
-    plt.figure()
-    plt.plot(np.linspace(1, steps, steps), rho_diff)
-    plt.plot(np.linspace(1, steps, steps), vx_diff)
-    plt.plot(np.linspace(1, steps, steps), vy_diff)
-    plt.legend(["RHO Error", "VX Error", "VY Error"])
-    plt.savefig("/home/oguzziya/Repos/Simulations/torch_cpu_gpu_error.png")
+    # plt.figure()
+    # plt.plot(np.linspace(1, steps, steps), rho_diff)
+    # plt.plot(np.linspace(1, steps, steps), vx_diff)
+    # plt.plot(np.linspace(1, steps, steps), vy_diff)
+    # plt.legend(["RHO Error", "VX Error", "VY Error"])
+    # plt.savefig("/home/oguzziya/Repos/Simulations/torch_cpu_gpu_error.png")
 
 
 if __name__ == '__main__':
