@@ -1,3 +1,0 @@
-phi
-tests
-webglviewer
