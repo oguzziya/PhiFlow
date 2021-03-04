@@ -22,24 +22,20 @@ def numpy_manual(resolutions, steps, dimension):
         if not os.path.exists(IMG_PATH):
             os.makedirs(IMG_PATH)
 
+    print("resolution,rho_means,vx_means,vy_means")
     for RES in resolutions:
       
       FLOW = Fluid(Domain([RES] * DIM, boundaries=OPEN), batch_size=BATCH_SIZE, buoyancy_factor=BUOYANCY)
       DENSITY = FLOW.density
       VELOCITY = FLOW.velocity
       
+      INFLOW_DENSITY = math.zeros_like(FLOW.density)
+      INFLOW_DENSITY.data[..., (RES // 10 * 1):(RES // 10 * 3), (RES // 6 * 2):(RES // 6 * 3), 0] = -0.5
+
       for i in range(steps):
-
-          INFLOW_DENSITY = math.zeros_like(FLOW.density)
-          if DIM == 2:
-              INFLOW_DENSITY.data[..., (RES // 10 * 1):(RES // 10 * 3), (RES // 6 * 2):(RES // 6 * 3), 0] = -0.5
-          else:
-              INFLOW_DENSITY.data[..., (RES // 4 * 2):(RES // 4 * 3), (RES // 4 * 1):(RES // 4 * 3), (RES // 4):(RES // 4 * 3), 0] = 1.
-
           DENSITY = advect.semi_lagrangian(DENSITY, VELOCITY, DT) + DT * INFLOW_DENSITY
           VELOCITY = advect.semi_lagrangian(VELOCITY, VELOCITY, DT) + buoyancy(DENSITY, GRAVITY, FLOW.buoyancy_factor) * DT
-
-          print("RHO Mean: {:5f} - VX Mean: {:5f} - VY Mean: {:5f}".format(np.mean(DENSITY.data), np.mean(VELOCITY.unstack()[1].data), np.mean(VELOCITY.unstack()[0].data)))
+          print("{},{},{},{}".format(RES, np.mean(DENSITY.data), np.mean(VELOCITY.unstack()[1].data), np.mean(VELOCITY.unstack()[0].data)))
 
 def torch_manual(resolutions, steps, dimension):
     device = "cuda:0"
@@ -49,8 +45,10 @@ def torch_manual(resolutions, steps, dimension):
     BATCH_SIZE = 1
     STEPS = steps
     DT = 0.6
-    GRAVITY = 9.81
+    GRAVITY = -9.81
     BUOYANCY = 0.2
+
+    torch.set_default_dtype(torch.float64)
 
     IMG_PATH = os.path.expanduser("~/Repos/Simulations/phi/torch/gpu")
 
@@ -58,48 +56,33 @@ def torch_manual(resolutions, steps, dimension):
         if not os.path.exists(IMG_PATH):
             os.makedirs(IMG_PATH)
 
+    print("resolution,rho_means,vx_means,vy_means")
     for RES in resolutions:        
         FLOW = Fluid(Domain([RES] * DIM, boundaries=OPEN), batch_size=BATCH_SIZE, buoyancy_factor=0.2)
-        FLOW_TORCH = torch_from_numpy(FLOW)
 
-        DENSITY = FLOW_TORCH.density
-        VELOCITY = FLOW_TORCH.velocity
+        DENSITY = FLOW.density
+        VELOCITY = FLOW.velocity
 
-        if DIM == 2:
-            density_shape = [1, RES, RES, 1]
-            inflow_tensor = torch.zeros(size=density_shape).to(device)
-            inflow_tensor[0, (RES // 10 * 1):(RES // 10 * 3), (RES // 6 * 2):(RES // 6 * 3), 0] = -0.5
-        elif DIM == 3:
-            density_shape = [1, RES, RES, RES, 1]
-            inflow_tensor = torch.zeros(size=density_shape)
-            inflow_tensor[0, (res // 4 * 2):(res // 4 * 3), (res // 4 * 1):(res // 4 * 3), (res // 4):(res // 4 * 3), 0] = -1.0
+        density_shape = [1, RES, RES, 1]
+        inflow_tensor = torch.zeros(size=density_shape).to(device)
+        inflow_tensor[0, (RES // 10 * 1):(RES // 10 * 3), (RES // 6 * 2):(RES // 6 * 3), 0] = -0.5
 
         VEL_X = VELOCITY.unstack()[1]
         VEL_Y = VELOCITY.unstack()[0]
-        if DIM == 3:
-            VEL_Z = VELOCITY.unstack()[2]
 
-        if DIM == 2:
-            RHO = CustomField(DENSITY, device, DIM, RES)
-            RHO_BUO = copy(RHO)
-            VX = CustomField(VEL_X, device, DIM, RES)
-            VY = CustomField(VEL_Y, device, DIM, RES)
+        RHO = CustomField(DENSITY, device, DIM, RES)
+        VX = CustomField(VEL_X, device, DIM, RES)
+        VY = CustomField(VEL_Y, device, DIM, RES)
 
-        if DIM == 3:
-            RHO = CustomField(DENSITY, device, DIM, RES)
-            RHO_BUO = copy(RHO)
-            VX = CustomField(VEL_X, device, DIM, RES)
-            VY = CustomField(VEL_Y, device, DIM, RES)
-            VZ = CustomField(VEL_Z, device, DIM, RES)
+        for i in range(STEPS):          
+            RHO.advect(VX, VY, DT)    
+            VX.advect(VX, VY, DT)
+            VY.advect(VX, VY, DT)
 
-        for i in range(STEPS):
-
-            if DIM == 2:            
-                RHO.data = RHO.advect(VX, VY, DT) + inflow_tensor * DT
-                VX.data = VX.advect(VX, VY, DT)
-                VY.data = VY.advect(VX, VY, DT) + RHO.resample(VY.points) * DT * BUOYANCY * GRAVITY
+            RHO.data += inflow_tensor * DT
+            VY.data += RHO.resample(VY.points) * DT * BUOYANCY * GRAVITY
                 
-                print("RHO Mean: {:5f} - VX Mean: {:5f} - VY Mean: {:5f}".format(torch.mean(RHO.data.cpu()), torch.mean(VX.data.cpu()), torch.mean(VY.data.cpu())))
+            print("{},{},{},{}".format(RES, torch.mean(RHO.data.cpu()), torch.mean(VX.data.cpu()), torch.mean(VY.data.cpu())))
 
             if SAVE_IMAGE:
                 array = RHO.data.cpu().data.numpy()
@@ -118,7 +101,7 @@ def torch_manual(resolutions, steps, dimension):
 
 if __name__ == '__main__':
     resolutions = [int(res) for res in sys.argv[1:-1]]
-    steps = 20
+    steps = 100
     case = sys.argv[-1]
 
     if case == "cpu":
