@@ -1,5 +1,4 @@
 from custom_field import CustomField
-from phi.torch.flow import *
 import matplotlib.pyplot as plt
 import torch
 import time
@@ -8,16 +7,14 @@ import sys
 import os
 import subprocess
 
-def torch_gpu_manual(resolutions, steps, dimension):
-    device = "cpu"
+def numpy_manual(resolutions, steps, dimension):
     SAVE_IMAGE = False
-    ANIMATE = False
-    IS_PRESSURE = False
 
     DIM = dimension
     BATCH_SIZE = 1
-    STEPS = steps
     DT = 0.6
+    GRAVITY = 9.81
+    BUOYANCY = 0.2
 
     IMG_PATH = os.path.expanduser("~/Repos/Simulations/phi/torch/gpu")
 
@@ -25,16 +22,49 @@ def torch_gpu_manual(resolutions, steps, dimension):
         if not os.path.exists(IMG_PATH):
             os.makedirs(IMG_PATH)
 
-    mean_dict = {"rho": [], "vx": [], "vy": []}
-
     for RES in resolutions:
+      
+      FLOW = Fluid(Domain([RES] * DIM, boundaries=OPEN), batch_size=BATCH_SIZE, buoyancy_factor=BUOYANCY)
+      DENSITY = FLOW.density
+      VELOCITY = FLOW.velocity
+      
+      for i in range(steps):
+
+          INFLOW_DENSITY = math.zeros_like(FLOW.density)
+          if DIM == 2:
+              INFLOW_DENSITY.data[..., (RES // 10 * 1):(RES // 10 * 3), (RES // 6 * 2):(RES // 6 * 3), 0] = -0.5
+          else:
+              INFLOW_DENSITY.data[..., (RES // 4 * 2):(RES // 4 * 3), (RES // 4 * 1):(RES // 4 * 3), (RES // 4):(RES // 4 * 3), 0] = 1.
+
+          DENSITY = advect.semi_lagrangian(DENSITY, VELOCITY, DT) + DT * INFLOW_DENSITY
+          VELOCITY = advect.semi_lagrangian(VELOCITY, VELOCITY, DT) + buoyancy(DENSITY, GRAVITY, FLOW.buoyancy_factor) * DT
+
+          print("RHO Mean: {:5f} - VX Mean: {:5f} - VY Mean: {:5f}".format(np.mean(DENSITY.data), np.mean(VELOCITY.unstack()[1].data), np.mean(VELOCITY.unstack()[0].data)))
+
+def torch_manual(resolutions, steps, dimension):
+    device = "cuda:0"
+    SAVE_IMAGE = False
+
+    DIM = dimension
+    BATCH_SIZE = 1
+    STEPS = steps
+    DT = 0.6
+    GRAVITY = 9.81
+    BUOYANCY = 0.2
+
+    IMG_PATH = os.path.expanduser("~/Repos/Simulations/phi/torch/gpu")
+
+    if SAVE_IMAGE:
+        if not os.path.exists(IMG_PATH):
+            os.makedirs(IMG_PATH)
+
+    for RES in resolutions:        
         FLOW = Fluid(Domain([RES] * DIM, boundaries=OPEN), batch_size=BATCH_SIZE, buoyancy_factor=0.2)
         FLOW_TORCH = torch_from_numpy(FLOW)
 
         DENSITY = FLOW_TORCH.density
         VELOCITY = FLOW_TORCH.velocity
 
-        # Set the GPU threads
         if DIM == 2:
             density_shape = [1, RES, RES, 1]
             inflow_tensor = torch.zeros(size=density_shape).to(device)
@@ -62,21 +92,16 @@ def torch_gpu_manual(resolutions, steps, dimension):
             VY = CustomField(VEL_Y, device, DIM, RES)
             VZ = CustomField(VEL_Z, device, DIM, RES)
 
-        print("step,resample-time,advection-time")
         for i in range(STEPS):
 
             if DIM == 2:            
                 RHO.data = RHO.advect(VX, VY, DT) + inflow_tensor * DT
                 VX.data = VX.advect(VX, VY, DT)
-                VY.data = VY.advect(VX, VY, DT) + RHO.resample(VY.points) * DT * 0.2 * (-9.81)
+                VY.data = VY.advect(VX, VY, DT) + RHO.resample(VY.points) * DT * BUOYANCY * GRAVITY
                 
                 print("RHO Mean: {:5f} - VX Mean: {:5f} - VY Mean: {:5f}".format(torch.mean(RHO.data.cpu()), torch.mean(VX.data.cpu()), torch.mean(VY.data.cpu())))
-                
-                mean_dict["rho"].append(torch.mean(RHO.data.cpu()))
-                mean_dict["vx"].append(torch.mean(VX.data.cpu()))
-                mean_dict["vy"].append(torch.mean(VY.data.cpu()))
 
-            if ANIMATE or SAVE_IMAGE:
+            if SAVE_IMAGE:
                 array = RHO.data.cpu().data.numpy()
                 if len(array.shape) <= 4:
                     ima = np.reshape(array[0], [array.shape[1], array.shape[2]])  # remove channel dimension , 2d
@@ -88,35 +113,19 @@ def torch_gpu_manual(resolutions, steps, dimension):
                 ax = fig.add_subplot(1, 1, 1)
                 cs = ax.contourf(ima, cmap=cmap)
                 fig.colorbar(cs, ax=ax)
-                if ANIMATE:
-                    plt.draw()
-                    plt.pause(0.5)
-                    plt.close()
-                else:
-                    plt.savefig(os.path.join(IMG_PATH, "torchGPU_" + str(i) + ".png"))
-                    plt.close()
-    return mean_dict
-
-def run():
-    resolutions = [int(res) for res in sys.argv[1:]]
-    
-    steps = 20
- 
-    #cpu_means = torch_cpu_manual(resolutions, steps, 2)
-    #print("-------------------------------------------")
-    gpu_means = torch_gpu_manual(resolutions, steps, 2)
-
-    # rho_diff = np.square(np.asarray(gpu_means["rho"]) - np.asarray(cpu_means["rho"]))
-    # vx_diff  = np.square(np.asarray(gpu_means["vx"]) - np.asarray(cpu_means["vx"]))
-    # vy_diff  = np.square(np.asarray(gpu_means["vy"]) - np.asarray(cpu_means["vy"]))
-
-    # plt.figure()
-    # plt.plot(np.linspace(1, steps, steps), rho_diff)
-    # plt.plot(np.linspace(1, steps, steps), vx_diff)
-    # plt.plot(np.linspace(1, steps, steps), vy_diff)
-    # plt.legend(["RHO Error", "VX Error", "VY Error"])
-    # plt.savefig("/home/oguzziya/Repos/Simulations/torch_cpu_gpu_error.png")
-
+                plt.savefig(os.path.join(IMG_PATH, "torchGPU_" + str(i) + ".png"))
+                plt.close()
 
 if __name__ == '__main__':
-    run()
+    resolutions = [int(res) for res in sys.argv[1:-1]]
+    steps = 20
+    case = sys.argv[-1]
+
+    if case == "cpu":
+      from phi.flow import *
+      numpy_manual(resolutions, steps, 2)
+    elif case == "gpu":
+      from phi.torch.flow import *
+      torch_manual(resolutions, steps, 2)
+    else:
+      print("Spcify: cpu or gpu")
