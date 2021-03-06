@@ -1,9 +1,0 @@
-resample.cc
-resample_gradient.cc
-resample_gradient_kernel.cu
-resample_kernel.cu
-setup.py
-resample_torch.egg-info/PKG-INFO
-resample_torch.egg-info/SOURCES.txt
-resample_torch.egg-info/dependency_links.txt
-resample_torch.egg-info/top_level.txt

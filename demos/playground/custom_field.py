@@ -8,7 +8,6 @@ class CustomField:
         self.dim = dim
         self.res = res
         self.device = device
-        self.grid_shape = torch.tensor(field.points.data.shape).to(device)
 
         self.data = torch.as_tensor(field.data, dtype=torch.float64).to(device)
         self.points = torch.as_tensor(field.points.data, dtype=torch.float64).to(device)
