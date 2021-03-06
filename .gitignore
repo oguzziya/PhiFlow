@@ -10,3 +10,8 @@ data/*
 .cache
 run_tests.sh
 build
+__pycache__
+*.log
+*.csv
+*.png
+*.jpeg
